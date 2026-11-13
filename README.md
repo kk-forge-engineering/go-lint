@@ -9,7 +9,7 @@ Add go-lint to the repo's `mise.toml`. mise builds it with `go install`, in its 
 ```toml
 [tools]
 go = "1"
-"go:github.com/kk-forge-engineering/go-lint/cmd/go-lint" = "1.0.0"
+"go:github.com/kk-forge-engineering/go-lint/cmd/go-lint" = "1.0.1"
 
 [tasks.lint]
 run = "go-lint run ./..."
@@ -74,7 +74,7 @@ A linter is in the set when it catches a bug or a security hole and rarely repor
 
 `noctx` and `gosec` skip test files: a test runs under its own deadline and serves no traffic. gosec's other rules stay off, because in our code they mostly report correct code.
 
-The formatters are `gofumpt`, a stricter `gofmt`, and `gci`, which groups imports into the standard library, other modules and the module's own packages.
+The formatters are `gofumpt`, a stricter `gofmt`, and `gci`, which groups imports into the standard library, other modules and the module's own packages. gofumpt takes an import whose first path element has no dot for the standard library, so go-lint gives it the module path from the nearest `go.mod` above the working directory. With that path, `go-lint run` accepts what `go-lint fmt` writes in a module such as `idea_packer`. gofumpt knows only that one module path. Where the module imports another module through `go.work` or `replace`, and that module's path has no dot and starts with a different element, `go-lint run` still reports what `go-lint fmt` wrote.
 
 ## layers
 

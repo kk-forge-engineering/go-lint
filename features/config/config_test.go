@@ -10,8 +10,11 @@ import (
 	"github.com/kk-forge-engineering/go-lint/features/config"
 )
 
+// goMod is the go.mod of the modules the tests build their configuration for.
+var goMod = &fstest.MapFile{Data: []byte("module idea_packer/backend\n\ngo 1.26.0\n")}
+
 func TestForAddsEachExclusionWithoutItsReason(t *testing.T) {
-	module := fstest.MapFS{"go-lint.yml": {Data: []byte(`exclusions:
+	module := fstest.MapFS{"go.mod": goMod, "go-lint.yml": {Data: []byte(`exclusions:
   - path: tools/
     linters: [errcheck]
     reason: the tools are throwaway scripts
@@ -61,9 +64,11 @@ func TestForFails(t *testing.T) {
 			"on a golangci-lint configuration of the module's own", ".golangci.yml", "version: \"2\"\n",
 			"go-lint reads no .golangci.yml",
 		},
+		{"on a go.mod without a module path", "go.mod", "go 1.26.0\n", "go.mod declares no module path"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := config.For(fstest.MapFS{test.file: {Data: []byte(test.content)}})
+			module := fstest.MapFS{"go.mod": goMod, test.file: {Data: []byte(test.content)}}
+			_, err := config.For(module)
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Errorf("For() error = %v, want one containing %q", err, test.want)
 			}
@@ -72,7 +77,7 @@ func TestForFails(t *testing.T) {
 }
 
 func TestForWithoutGoLintYmlKeepsTheBuiltInSet(t *testing.T) {
-	data, err := config.For(fstest.MapFS{})
+	data, err := config.For(fstest.MapFS{"go.mod": goMod})
 	if err != nil {
 		t.Fatal(err)
 	}

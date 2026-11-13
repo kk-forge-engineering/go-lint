@@ -37,9 +37,9 @@ func TestMain(m *testing.M) {
 	if err := build.Run(); err != nil {
 		panic(err)
 	}
-	// The test reads testdata/consumer, so an edit to it runs the tests again. go test keys its cache only on the files
-	// the test process opens, and go-lint reads the consumer in a process of its own.
-	if err := readAll("testdata/consumer"); err != nil {
+	// The test reads the modules in testdata, so an edit to one runs the tests again. go test keys its cache only on
+	// the files the test process opens, and go-lint reads a module in a process of its own.
+	if err := readAll("testdata"); err != nil {
 		panic(err)
 	}
 	for _, name := range []string{"GOCACHE", "GOMODCACHE"} {
@@ -67,14 +67,14 @@ func readAll(dir string) error {
 // goLint runs go-lint in testdata/consumer and returns its output and exit code.
 func goLint(t *testing.T, args ...string) (string, int) {
 	t.Helper()
-	return goLintIn(t, t.TempDir(), args...)
+	return goLintIn(t, "testdata/consumer", t.TempDir(), args...)
 }
 
-// goLintIn runs go-lint as goLint does, with home as the user's home folder, which holds the user's cache.
-func goLintIn(t *testing.T, home string, args ...string) (string, int) {
+// goLintIn runs go-lint in dir, with home as the user's home folder, which holds the user's cache.
+func goLintIn(t *testing.T, dir, home string, args ...string) (string, int) {
 	t.Helper()
 	command := exec.Command(binary, args...)
-	command.Dir = "testdata/consumer"
+	command.Dir = dir
 	// The go tool's caches stay where they are, so the run compiles nothing again.
 	command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, ".cache"),
 		"GOCACHE="+goEnv["GOCACHE"], "GOMODCACHE="+goEnv["GOMODCACHE"], "GOLANGCI_LINT_CACHE="+t.TempDir())
@@ -111,10 +111,34 @@ func TestRunReportsTheLayersAnalyzerAndAppliesTheProjectExclusions(t *testing.T)
 	}
 }
 
+func TestRunAcceptsWhatFmtWritesInAModuleWithoutADotInItsPath(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS("testdata/dotless")); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+
+	if output, code := goLintIn(t, dir, home, "fmt"); code != 0 {
+		t.Fatalf("go-lint fmt exited %d, want 0\n%s", code, output)
+	}
+	output, code := goLintIn(t, dir, home, "run", "./...")
+
+	formatted, err := os.ReadFile(filepath.Join(dir, "features", "hello", "hello.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(formatted), "\"fmt\"\n\n\t\"dotless/app/shared/greet\"") {
+		t.Errorf("go-lint fmt left the imports without the module's own group:\n%s", formatted)
+	}
+	if code != 0 {
+		t.Errorf("go-lint run after go-lint fmt exited %d, want 0\n%s", code, output)
+	}
+}
+
 // A configuration can load code, so go-lint writes its own on each run over a file it finds in its cache.
 func TestRunReplacesAConfigurationFileFoundInItsCache(t *testing.T) {
 	home := t.TempDir()
-	goLintIn(t, home, "run", "./...")
+	goLintIn(t, "testdata/consumer", home, "run", "./...")
 	files, err := filepath.Glob(filepath.Join(home, "*", "*", "go-lint", "*.yml"))
 	if err != nil || len(files) == 0 {
 		files, err = filepath.Glob(filepath.Join(home, "*", "go-lint", "*.yml"))
@@ -126,7 +150,7 @@ func TestRunReplacesAConfigurationFileFoundInItsCache(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	output, code := goLintIn(t, home, "run", "./...")
+	output, code := goLintIn(t, "testdata/consumer", home, "run", "./...")
 
 	if code != 1 || !strings.Contains(output, "(layers)") {
 		t.Errorf("go-lint run over a planted configuration exited %d, want 1 with the layers issue\n%s", code, output)
