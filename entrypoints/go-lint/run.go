@@ -1,5 +1,5 @@
 // Package golint is go-lint's command: golangci-lint with the layers analyzer and the configuration built into
-// go-lint.
+// go-lint, and govulncheck.
 package golint
 
 import (
@@ -23,7 +23,8 @@ import (
 )
 
 const usage = `usage: go-lint run [packages]   lint, and check the formatting
-       go-lint fmt [paths]      format`
+       go-lint fmt [paths]      format
+       go-lint vuln [packages]  report the known vulnerabilities the code calls`
 
 // forbidden lists the golangci-lint flags that would change the built-in configuration, so a run on a laptop and a
 // run in CI check the same rules.
@@ -35,8 +36,11 @@ var forbidden = []string{
 	"-n", "--new", "--new-from-rev", "--new-from-patch", "--new-from-merge-base", "--whole-files",
 }
 
-// Run runs go-lint with the process's arguments, and exits with golangci-lint's exit code.
+// Run runs go-lint with the process's arguments, and exits with the exit code of golangci-lint or govulncheck.
 func Run() {
+	if len(os.Args) > 1 && os.Args[1] == "vuln" {
+		os.Exit(vuln(os.Args[2:]))
+	}
 	if err := prepare(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "go-lint:", err)
 		os.Exit(2)

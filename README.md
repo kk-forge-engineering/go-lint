@@ -1,6 +1,6 @@
 # go-lint
 
-KK Forge's build of golangci-lint for Go modules, the Go counterpart of `@kk-forge/oxlint-config`. One versioned binary carries the linters, their configuration and the `layers` analyzer, so a repo keeps no `.golangci.yml`, and a laptop and CI check the same rules.
+KK Forge's build of golangci-lint for Go modules, the Go counterpart of `@kk-forge/oxlint-config`. One versioned binary carries the linters, their configuration, the `layers` analyzer and govulncheck, so a repo keeps no `.golangci.yml`, and a laptop and CI check the same rules.
 
 ## Use
 
@@ -9,10 +9,10 @@ Add go-lint to the repo's `mise.toml`. mise builds it with `go install`, in its 
 ```toml
 [tools]
 go = "1"
-"go:github.com/kk-forge-engineering/go-lint/cmd/go-lint" = "1.0.1"
+"go:github.com/kk-forge-engineering/go-lint/cmd/go-lint" = "1.1.0"
 
 [tasks.lint]
-run = "go-lint run ./..."
+run = ["go-lint run ./...", "go-lint vuln ./..."]
 
 [tasks."lint:fix"]
 run = "go-lint fmt"
@@ -23,10 +23,11 @@ run = "go-lint fmt"
   - the result: `--issues-exit-code`, `--tests`, `--max-issues-per-linter`, `--max-same-issues`, `--uniq-by-line`
   - the filters to new issues: `-n`, `--new`, `--new-from-rev`, `--new-from-patch`, `--new-from-merge-base`, `--whole-files`
 - `go-lint fmt [paths]` formats the code.
+- `go-lint vuln [packages]` runs govulncheck: it reports each known vulnerability the code calls, and exits 3 when it finds one. It reads the Go vulnerability database online on each run, so it needs the network. A vulnerable module the code never calls does not fail the run, and neither does a call from a test file. It also checks the standard library of the Go that runs it: a call into a vulnerability that a later Go fixes fails the run until `mise upgrade go` installs that Go. It takes no flag, because a flag could choose another database or let a finding pass.
 
-go-lint refuses to run beside a `.golangci.yml`, `.yaml`, `.toml` or `.json` at the Go module root.
+`go-lint run` and `go-lint fmt` refuse to run beside a `.golangci.yml`, `.yaml`, `.toml` or `.json` at the Go module root.
 
-go-lint refuses a module whose path has no dot in its first element, such as `idea_packer`. gofumpt takes an import of such a path for the standard library unless it starts like the module's own path, and gci groups it apart, so where one such module imports another, `go-lint run` refuses what `go-lint fmt` writes. Name the module after its repository, such as `github.com/kk-forge-engineering/<repo>`.
+They also refuse a module whose path has no dot in its first element, such as `idea_packer`. gofumpt takes an import of such a path for the standard library unless it starts like the module's own path, and gci groups it apart, so where one such module imports another, `go-lint run` refuses what `go-lint fmt` writes. Name the module after its repository, such as `github.com/kk-forge-engineering/<repo>`.
 
 ## Exclusions
 

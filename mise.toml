@@ -18,8 +18,8 @@ description = "Build every package (keeps no binary)"
 run = "go build ./..."
 
 [tasks.lint]
-description = "go-lint from this checkout over its own code: the linters and the formatting"
-run = "go run ./cmd/go-lint run ./..."
+description = "go-lint from this checkout over its own code: the linters, the formatting and the known vulnerabilities"
+run = ["go run ./cmd/go-lint run ./...", "go run ./cmd/go-lint vuln ./..."]
 
 [tasks."lint:fix"]
 description = "Format the code with go-lint from this checkout"

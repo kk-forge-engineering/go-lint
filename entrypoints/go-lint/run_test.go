@@ -111,6 +111,29 @@ func TestRunReportsTheLayersAnalyzerAndAppliesTheProjectExclusions(t *testing.T)
 	}
 }
 
+// The fixture calls language.Parse of golang.org/x/text v0.3.0, which GO-2021-0113 names. The scan reads the
+// vulnerability database online, so the test needs the network.
+func TestVulnReportsAVulnerabilityTheCodeCalls(t *testing.T) {
+	output, code := goLintIn(t, "testdata/vulnerable", t.TempDir(), "vuln")
+
+	if code != 3 || !strings.Contains(output, "GO-2021-0113") {
+		t.Errorf("go-lint vuln exited %d, want 3 with GO-2021-0113\n%s", code, output)
+	}
+}
+
+// govulncheck takes the standard library's version from GOVERSION when the environment sets it, so a repo could
+// set one past every fix and hide each finding there. go-lint asks the toolchain. The fixture calls url.Parse, and
+// GO-2025-4010 there was fixed in go1.24.8, so a scan of go1.10 reports it and a scan of the toolchain does not.
+func TestVulnIgnoresAGoVersionTheEnvironmentSets(t *testing.T) {
+	t.Setenv("GOVERSION", "go1.10")
+
+	output, _ := goLintIn(t, "testdata/vulnerable", t.TempDir(), "vuln")
+
+	if !strings.Contains(output, "GO-2021-0113") || strings.Contains(output, "GO-2025-4010") {
+		t.Errorf("go-lint vuln with GOVERSION=go1.10 output = %s\nwant GO-2021-0113 and no GO-2025-4010", output)
+	}
+}
+
 // A configuration can load code, so go-lint writes its own on each run over a file it finds in its cache.
 func TestRunReplacesAConfigurationFileFoundInItsCache(t *testing.T) {
 	home := t.TempDir()
@@ -151,6 +174,7 @@ func TestGoLintRefuses(t *testing.T) {
 		},
 		{"a flag that changes the exit code", []string{"run", "--issues-exit-code=0"}, "--issues-exit-code changes"},
 		{"a filter to new issues", []string{"run", "-n"}, "-n changes the built-in configuration"},
+		{"a flag to vuln", []string{"vuln", "-db", "file:///tmp/db"}, "-db is a flag, and go-lint vuln takes package patterns only"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			output, code := goLint(t, test.args...)
