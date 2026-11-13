@@ -26,6 +26,8 @@ run = "go-lint fmt"
 
 go-lint refuses to run beside a `.golangci.yml`, `.yaml`, `.toml` or `.json` at the Go module root.
 
+go-lint refuses a module whose path has no dot in its first element, such as `idea_packer`. gofumpt takes an import of such a path for the standard library unless it starts like the module's own path, and gci groups it apart, so where one such module imports another, `go-lint run` refuses what `go-lint fmt` writes. Name the module after its repository, such as `github.com/kk-forge-engineering/<repo>`.
+
 ## Exclusions
 
 A repo excludes issues in `go-lint.yml` at its Go module root. Each entry is a golangci-lint exclusion rule (`path`, `path-except`, `linters`, `text`, `source`) with a `reason`. go-lint fails when an entry has no reason or the file holds any other key. Paths are read from the Go module root.
@@ -74,7 +76,7 @@ A linter is in the set when it catches a bug or a security hole and rarely repor
 
 `noctx` and `gosec` skip test files: a test runs under its own deadline and serves no traffic. gosec's other rules stay off, because in our code they mostly report correct code.
 
-The formatters are `gofumpt`, a stricter `gofmt`, and `gci`, which groups imports into the standard library, other modules and the module's own packages. gofumpt takes an import whose first path element has no dot for the standard library, so go-lint gives it the module path from the nearest `go.mod` above the working directory. With that path, `go-lint run` accepts what `go-lint fmt` writes in a module such as `idea_packer`. gofumpt knows only that one module path. Where the module imports another module through `go.work` or `replace`, and that module's path has no dot and starts with a different element, `go-lint run` still reports what `go-lint fmt` wrote.
+The formatters are `gofumpt`, a stricter `gofmt`, and `gci`, which groups imports into the standard library, other modules and the module's own packages.
 
 ## layers
 

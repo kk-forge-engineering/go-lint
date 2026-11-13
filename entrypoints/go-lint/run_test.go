@@ -111,30 +111,6 @@ func TestRunReportsTheLayersAnalyzerAndAppliesTheProjectExclusions(t *testing.T)
 	}
 }
 
-func TestRunAcceptsWhatFmtWritesInAModuleWithoutADotInItsPath(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.CopyFS(dir, os.DirFS("testdata/dotless")); err != nil {
-		t.Fatal(err)
-	}
-	home := t.TempDir()
-
-	if output, code := goLintIn(t, dir, home, "fmt"); code != 0 {
-		t.Fatalf("go-lint fmt exited %d, want 0\n%s", code, output)
-	}
-	output, code := goLintIn(t, dir, home, "run", "./...")
-
-	formatted, err := os.ReadFile(filepath.Join(dir, "features", "hello", "hello.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(formatted), "\"fmt\"\n\n\t\"dotless/app/shared/greet\"") {
-		t.Errorf("go-lint fmt left the imports without the module's own group:\n%s", formatted)
-	}
-	if code != 0 {
-		t.Errorf("go-lint run after go-lint fmt exited %d, want 0\n%s", code, output)
-	}
-}
-
 // A configuration can load code, so go-lint writes its own on each run over a file it finds in its cache.
 func TestRunReplacesAConfigurationFileFoundInItsCache(t *testing.T) {
 	home := t.TempDir()
