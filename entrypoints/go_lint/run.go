@@ -1,6 +1,6 @@
-// Package golint is go-lint's command: golangci-lint with the layers analyzer and the configuration built into
+// Package go_lint is go-lint's command: golangci-lint with the layers analyzer and the configuration built into
 // go-lint, and govulncheck.
-package golint
+package go_lint
 
 import (
 	"crypto/sha256"
@@ -17,14 +17,14 @@ import (
 	"github.com/golangci/plugin-module-register/register"
 	"golang.org/x/tools/go/analysis"
 
-	module "github.com/kk-forge-engineering/go-lint"
-	"github.com/kk-forge-engineering/go-lint/features/config"
-	"github.com/kk-forge-engineering/go-lint/features/layers"
+	module "github.com/kk-forge-engineering/go-lint/v2"
+	"github.com/kk-forge-engineering/go-lint/v2/features/config"
+	"github.com/kk-forge-engineering/go-lint/v2/features/layers"
 )
 
-const usage = `usage: go-lint run [packages]   lint, and check the formatting
-       go-lint fmt [paths]      format
-       go-lint vuln [packages]  report the known vulnerabilities the code calls`
+const usage = `usage: go_lint run [packages]   lint, and check the formatting
+       go_lint fmt [paths]      format
+       go_lint vuln [packages]  report the known vulnerabilities the code calls`
 
 // forbidden lists the golangci-lint flags that would change the built-in configuration, so a run on a laptop and a
 // run in CI check the same rules.
@@ -42,13 +42,13 @@ func Run() {
 		os.Exit(vuln(os.Args[2:]))
 	}
 	if err := prepare(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "go-lint:", err)
+		fmt.Fprintln(os.Stderr, "go_lint:", err)
 		os.Exit(2)
 	}
 	// golangci-lint prints an error of its command line, but not one from reading --color or --verbose, so go-lint
 	// prints each error, as golangci-lint's own main does.
 	if err := commands.Execute(commands.BuildInfo{Version: cacheVersion(), GoVersion: "", Date: "", Commit: ""}); err != nil {
-		fmt.Fprintln(os.Stderr, "go-lint:", err)
+		fmt.Fprintln(os.Stderr, "go_lint:", err)
 		os.Exit(exitcodes.Failure)
 	}
 }
@@ -124,7 +124,7 @@ func writeConfig(data []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(cache, "go-lint")
+	dir := filepath.Join(cache, "go_lint")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}

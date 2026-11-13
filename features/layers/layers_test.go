@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/tools/go/analysis/analysistest"
 
-	"github.com/kk-forge-engineering/go-lint/features/layers"
+	"github.com/kk-forge-engineering/go-lint/v2/features/layers"
 )
 
 func TestAnalyzerReportsEachProblemOfTheFixture(t *testing.T) {

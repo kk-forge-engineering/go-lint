@@ -1,5 +1,5 @@
 // Package config builds the golangci-lint configuration go-lint runs with: the set built into go-lint, plus the
-// module's path and the exclusions in the project's go-lint.yml.
+// module's path and the exclusions in the project's go_lint.yml.
 package config
 
 import (
@@ -15,12 +15,12 @@ import (
 )
 
 // fileName is the file at the Go module root that holds the project's exclusions.
-const fileName = "go-lint.yml"
+const fileName = "go_lint.yml"
 
 //go:embed golangci.yml
 var base []byte
 
-// exclusion is one entry of go-lint.yml: a golangci-lint exclusion rule and the reason the project gives for it.
+// exclusion is one entry of go_lint.yml: a golangci-lint exclusion rule and the reason the project gives for it.
 type exclusion struct {
 	Reason     string   `yaml:"reason,omitempty"`
 	Path       string   `yaml:"path,omitempty"`
@@ -32,7 +32,7 @@ type exclusion struct {
 
 // For returns the configuration for the Go module at the root of module. It fails when the module's path in go.mod is
 // missing or has no dot in its first element, when the module keeps a golangci-lint configuration of its own, or when
-// go-lint.yml holds an unknown key or an exclusion without a reason.
+// go_lint.yml holds an unknown key or an exclusion without a reason.
 func For(module fs.FS) ([]byte, error) {
 	for _, name := range []string{".golangci.yml", ".golangci.yaml", ".golangci.toml", ".golangci.json"} {
 		if _, err := fs.Stat(module, name); err == nil {
@@ -67,7 +67,7 @@ func For(module fs.FS) ([]byte, error) {
 
 // modulePath returns the module path in go.mod. It refuses a path without a dot in its first element, such as
 // idea_packer: gofumpt takes an import of such a path for the standard library unless it starts like the module's
-// own, and gci groups it apart, so where one such module imports another, go-lint run refuses what go-lint fmt
+// own, and gci groups it apart, so where one such module imports another, go_lint run refuses what go_lint fmt
 // writes.
 func modulePath(module fs.FS) (string, error) {
 	data, err := fs.ReadFile(module, "go.mod")
@@ -85,7 +85,7 @@ func modulePath(module fs.FS) (string, error) {
 	return path, nil
 }
 
-// readExclusions returns the exclusions in go-lint.yml, or none when the file does not exist.
+// readExclusions returns the exclusions in go_lint.yml, or none when the file does not exist.
 func readExclusions(module fs.FS) ([]exclusion, error) {
 	data, err := fs.ReadFile(module, fileName)
 	if errors.Is(err, fs.ErrNotExist) {

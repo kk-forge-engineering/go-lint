@@ -1,4 +1,4 @@
-package golint_test
+package go_lint_test
 
 import (
 	"errors"
@@ -13,26 +13,26 @@ import (
 	"testing"
 )
 
-// binary is go-lint, built once for the tests from cmd/go-lint.
+// binary is go_lint, built once for the tests from cmd/go_lint.
 var binary string
 
 // goEnv holds the go tool's own cache folders.
 var goEnv = map[string]string{}
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "go-lint-test-")
+	dir, err := os.MkdirTemp("", "go_lint_test_")
 	if err != nil {
 		panic(err)
 	}
-	binary = filepath.Join(dir, "go-lint")
+	binary = filepath.Join(dir, "go_lint")
 	args := []string{"build", "-o", binary}
 	// Under `mise run test:ci` the binary writes its coverage beside the tests', so the code it runs counts.
 	flag.Parse()
 	if coverDir := flag.Lookup("test.gocoverdir"); testing.CoverMode() != "" && coverDir.Value.String() != "" {
-		args = append(args, "-cover", "-coverpkg=github.com/kk-forge-engineering/go-lint/...")
+		args = append(args, "-cover", "-coverpkg=github.com/kk-forge-engineering/go-lint/v2/...")
 		_ = os.Setenv("GOCOVERDIR", coverDir.Value.String())
 	}
-	build := exec.Command("go", append(args, "../../cmd/go-lint")...)
+	build := exec.Command("go", append(args, "../../cmd/go_lint")...)
 	build.Stderr = os.Stderr
 	if err := build.Run(); err != nil {
 		panic(err)
@@ -99,7 +99,7 @@ func TestRunReportsTheLayersAnalyzerAndAppliesTheProjectExclusions(t *testing.T)
 		got = append(got, match[1]+" "+match[2])
 	}
 	slices.Sort(got)
-	// features/b's errcheck issue is excluded by testdata/consumer/go-lint.yml, and the request and TLS setting in features/f's
+	// features/b's errcheck issue is excluded by testdata/consumer/go_lint.yml, and the request and TLS setting in features/f's
 	// tests by the built-in exclusion for test files.
 	want := []string{
 		"features/a/a.go:3 layers", "features/c/c.go:7 nolintlint", "features/d/d.go:7 nolintlint",
@@ -107,7 +107,7 @@ func TestRunReportsTheLayersAnalyzerAndAppliesTheProjectExclusions(t *testing.T)
 		"features/f/tls.go:7 gosec",
 	}
 	if code != 1 || !slices.Equal(got, want) {
-		t.Errorf("go-lint run exited %d with issues %v, want 1 with %v\n%s", code, got, want, output)
+		t.Errorf("go_lint run exited %d with issues %v, want 1 with %v\n%s", code, got, want, output)
 	}
 }
 
@@ -117,7 +117,7 @@ func TestVulnReportsAVulnerabilityTheCodeCalls(t *testing.T) {
 	output, code := goLintIn(t, "testdata/vulnerable", t.TempDir(), "vuln")
 
 	if code != 3 || !strings.Contains(output, "GO-2021-0113") {
-		t.Errorf("go-lint vuln exited %d, want 3 with GO-2021-0113\n%s", code, output)
+		t.Errorf("go_lint vuln exited %d, want 3 with GO-2021-0113\n%s", code, output)
 	}
 }
 
@@ -130,7 +130,7 @@ func TestVulnIgnoresAGoVersionTheEnvironmentSets(t *testing.T) {
 	output, _ := goLintIn(t, "testdata/vulnerable", t.TempDir(), "vuln")
 
 	if !strings.Contains(output, "GO-2021-0113") || strings.Contains(output, "GO-2025-4010") {
-		t.Errorf("go-lint vuln with GOVERSION=go1.10 output = %s\nwant GO-2021-0113 and no GO-2025-4010", output)
+		t.Errorf("go_lint vuln with GOVERSION=go1.10 output = %s\nwant GO-2021-0113 and no GO-2025-4010", output)
 	}
 }
 
@@ -138,9 +138,9 @@ func TestVulnIgnoresAGoVersionTheEnvironmentSets(t *testing.T) {
 func TestRunReplacesAConfigurationFileFoundInItsCache(t *testing.T) {
 	home := t.TempDir()
 	goLintIn(t, "testdata/consumer", home, "run", "./...")
-	files, err := filepath.Glob(filepath.Join(home, "*", "*", "go-lint", "*.yml"))
+	files, err := filepath.Glob(filepath.Join(home, "*", "*", "go_lint", "*.yml"))
 	if err != nil || len(files) == 0 {
-		files, err = filepath.Glob(filepath.Join(home, "*", "go-lint", "*.yml"))
+		files, err = filepath.Glob(filepath.Join(home, "*", "go_lint", "*.yml"))
 	}
 	if err != nil || len(files) != 1 {
 		t.Fatalf("configuration files in the cache = %v, %v; want one", files, err)
@@ -152,7 +152,7 @@ func TestRunReplacesAConfigurationFileFoundInItsCache(t *testing.T) {
 	output, code := goLintIn(t, "testdata/consumer", home, "run", "./...")
 
 	if code != 1 || !strings.Contains(output, "(layers)") {
-		t.Errorf("go-lint run over a planted configuration exited %d, want 1 with the layers issue\n%s", code, output)
+		t.Errorf("go_lint run over a planted configuration exited %d, want 1 with the layers issue\n%s", code, output)
 	}
 }
 
@@ -174,12 +174,12 @@ func TestGoLintRefuses(t *testing.T) {
 		},
 		{"a flag that changes the exit code", []string{"run", "--issues-exit-code=0"}, "--issues-exit-code changes"},
 		{"a filter to new issues", []string{"run", "-n"}, "-n changes the built-in configuration"},
-		{"a flag to vuln", []string{"vuln", "-db", "file:///tmp/db"}, "-db is a flag, and go-lint vuln takes package patterns only"},
+		{"a flag to vuln", []string{"vuln", "-db", "file:///tmp/db"}, "-db is a flag, and go_lint vuln takes package patterns only"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			output, code := goLint(t, test.args...)
 			if code != 2 || !strings.Contains(output, test.want) {
-				t.Errorf("go-lint %v exited %d, want 2 with %q\n%s", test.args, code, test.want, output)
+				t.Errorf("go_lint %v exited %d, want 2 with %q\n%s", test.args, code, test.want, output)
 			}
 		})
 	}

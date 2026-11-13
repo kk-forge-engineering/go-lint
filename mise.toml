@@ -19,11 +19,11 @@ run = "go build ./..."
 
 [tasks.lint]
 description = "go-lint from this checkout over its own code: the linters, the formatting and the known vulnerabilities"
-run = ["go run ./cmd/go-lint run ./...", "go run ./cmd/go-lint vuln ./..."]
+run = ["go run ./cmd/go_lint run ./...", "go run ./cmd/go_lint vuln ./..."]
 
 [tasks."lint:fix"]
 description = "Format the code with go-lint from this checkout"
-run = "go run ./cmd/go-lint fmt"
+run = "go run ./cmd/go_lint fmt"
 
 [tasks.test]
 description = "The tests"
@@ -31,7 +31,7 @@ run = "go test ./..."
 
 [tasks."test:ci"]
 description = "The tests with coverage into coverage/coverage.out; a total under 80% fails"
-# The end-to-end test runs a go-lint binary built with coverage, which writes into the same folder as the tests.
+# The end-to-end test runs a go_lint binary built with coverage, which writes into the same folder as the tests.
 run = [
   "rm -rf coverage && mkdir -p coverage/raw",
   "go test -cover -coverpkg=./... ./... -args -test.gocoverdir=$PWD/coverage/raw",
