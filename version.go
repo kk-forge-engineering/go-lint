@@ -1,5 +1,5 @@
-// Package golint holds go-lint's release number.
-package golint
+// Package go_lint holds go-lint's release number.
+package go_lint
 
 import (
 	_ "embed"

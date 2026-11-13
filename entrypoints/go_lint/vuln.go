@@ -1,4 +1,4 @@
-package golint
+package go_lint
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 func vuln(patterns []string) int {
 	for _, pattern := range patterns {
 		if strings.HasPrefix(pattern, "-") {
-			fmt.Fprintf(os.Stderr, "go-lint: %s is a flag, and go-lint vuln takes package patterns only\n", pattern)
+			fmt.Fprintf(os.Stderr, "go_lint: %s is a flag, and go_lint vuln takes package patterns only\n", pattern)
 			return 2
 		}
 	}
@@ -37,7 +37,7 @@ func vuln(patterns []string) int {
 	if err == nil {
 		return 0
 	}
-	fmt.Fprintln(os.Stderr, "go-lint:", err)
+	fmt.Fprintln(os.Stderr, "go_lint:", err)
 	var exit interface{ ExitCode() int }
 	if errors.As(err, &exit) {
 		return exit.ExitCode()

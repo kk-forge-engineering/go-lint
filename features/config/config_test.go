@@ -7,14 +7,14 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/kk-forge-engineering/go-lint/features/config"
+	"github.com/kk-forge-engineering/go-lint/v2/features/config"
 )
 
 // goMod is the go.mod of the modules the tests build their configuration for.
 var goMod = &fstest.MapFile{Data: []byte("module github.com/kk-forge-engineering/idea-packer/backend\n\ngo 1.26.0\n")}
 
 func TestForAddsEachExclusionWithoutItsReason(t *testing.T) {
-	module := fstest.MapFS{"go.mod": goMod, "go-lint.yml": {Data: []byte(`exclusions:
+	module := fstest.MapFS{"go.mod": goMod, "go_lint.yml": {Data: []byte(`exclusions:
   - path: tools/
     linters: [errcheck]
     reason: the tools are throwaway scripts
@@ -48,18 +48,18 @@ func TestForFails(t *testing.T) {
 		name, file, content, want string
 	}{
 		{
-			"on an exclusion without a reason", "go-lint.yml", "exclusions:\n  - path: tools/\n    linters: [errcheck]\n",
-			"go-lint.yml: exclusion 1 has no reason",
+			"on an exclusion without a reason", "go_lint.yml", "exclusions:\n  - path: tools/\n    linters: [errcheck]\n",
+			"go_lint.yml: exclusion 1 has no reason",
 		},
 		{
-			"on a blank reason", "go-lint.yml", "exclusions:\n  - path: tools/\n    linters: [errcheck]\n    reason: \" \"\n",
-			"go-lint.yml: exclusion 1 has no reason",
+			"on a blank reason", "go_lint.yml", "exclusions:\n  - path: tools/\n    linters: [errcheck]\n    reason: \" \"\n",
+			"go_lint.yml: exclusion 1 has no reason",
 		},
 		{
-			"on a key it does not know", "go-lint.yml", "exclusions:\n  - path: tools/\n    reason: x\n    severity: low\n",
+			"on a key it does not know", "go_lint.yml", "exclusions:\n  - path: tools/\n    reason: x\n    severity: low\n",
 			"field severity not found",
 		},
-		{"on a setting other than exclusions", "go-lint.yml", "linters:\n  enable: [lll]\n", "field linters not found"},
+		{"on a setting other than exclusions", "go_lint.yml", "linters:\n  enable: [lll]\n", "field linters not found"},
 		{
 			"on a golangci-lint configuration of the module's own", ".golangci.yml", "version: \"2\"\n",
 			"go-lint reads no .golangci.yml",

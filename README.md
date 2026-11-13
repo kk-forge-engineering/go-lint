@@ -4,34 +4,34 @@ KK Forge's build of golangci-lint for Go modules, the Go counterpart of `@kk-for
 
 ## Use
 
-Add go-lint to the repo's `mise.toml`. mise builds it with `go install`, in its own module graph, so golangci-lint's dependencies stay out of the repo's `go.mod`:
+Add go-lint to the repo's `mise.toml`. Its command is `go_lint`: a name of several words joins its words with `_`. mise builds it with `go install`, in its own module graph, so golangci-lint's dependencies stay out of the repo's `go.mod`:
 
 ```toml
 [tools]
 go = "1"
-"go:github.com/kk-forge-engineering/go-lint/cmd/go-lint" = "1.1.0"
+"go:github.com/kk-forge-engineering/go-lint/v2/cmd/go_lint" = "2"
 
 [tasks.lint]
-run = ["go-lint run ./...", "go-lint vuln ./..."]
+run = ["go_lint run ./...", "go_lint vuln ./..."]
 
 [tasks."lint:fix"]
-run = "go-lint fmt"
+run = "go_lint fmt"
 ```
 
-- `go-lint run [packages]` runs the linters and checks the formatting. It takes golangci-lint's `run` flags. It refuses, in any form, the flags that change the rules or whether the run fails:
+- `go_lint run [packages]` runs the linters and checks the formatting. It takes golangci-lint's `run` flags. It refuses, in any form, the flags that change the rules or whether the run fails:
   - the set: `-c`, `--config`, `--no-config`, `-E`, `--enable`, `-D`, `--disable`, `--enable-only`, `--default`, `--fast-only`
   - the result: `--issues-exit-code`, `--tests`, `--max-issues-per-linter`, `--max-same-issues`, `--uniq-by-line`
   - the filters to new issues: `-n`, `--new`, `--new-from-rev`, `--new-from-patch`, `--new-from-merge-base`, `--whole-files`
-- `go-lint fmt [paths]` formats the code.
-- `go-lint vuln [packages]` runs govulncheck: it reports each known vulnerability the code calls, and exits 3 when it finds one. It reads the Go vulnerability database online on each run, so it needs the network. A vulnerable module the code never calls does not fail the run, and neither does a call from a test file. It also checks the standard library of the Go that runs it: a call into a vulnerability that a later Go fixes fails the run until `mise upgrade go` installs that Go. It takes no flag, because a flag could choose another database or let a finding pass.
+- `go_lint fmt [paths]` formats the code.
+- `go_lint vuln [packages]` runs govulncheck: it reports each known vulnerability the code calls, and exits 3 when it finds one. It reads the Go vulnerability database online on each run, so it needs the network. A vulnerable module the code never calls does not fail the run, and neither does a call from a test file. It also checks the standard library of the Go that runs it: a call into a vulnerability that a later Go fixes fails the run until `mise upgrade go` installs that Go. It takes no flag, because a flag could choose another database or let a finding pass.
 
-`go-lint run` and `go-lint fmt` refuse to run beside a `.golangci.yml`, `.yaml`, `.toml` or `.json` at the Go module root.
+`go_lint run` and `go_lint fmt` refuse to run beside a `.golangci.yml`, `.yaml`, `.toml` or `.json` at the Go module root.
 
-They also refuse a module whose path has no dot in its first element, such as `idea_packer`. gofumpt takes an import of such a path for the standard library unless it starts like the module's own path, and gci groups it apart, so where one such module imports another, `go-lint run` refuses what `go-lint fmt` writes. Name the module after its repository, such as `github.com/kk-forge-engineering/<repo>`.
+They also refuse a module whose path has no dot in its first element, such as `idea_packer`. gofumpt takes an import of such a path for the standard library unless it starts like the module's own path, and gci groups it apart, so where one such module imports another, `go_lint run` refuses what `go_lint fmt` writes. Name the module after its repository, such as `github.com/kk-forge-engineering/<repo>`.
 
 ## Exclusions
 
-A repo excludes issues in `go-lint.yml` at its Go module root. Each entry is a golangci-lint exclusion rule (`path`, `path-except`, `linters`, `text`, `source`) with a `reason`. go-lint fails when an entry has no reason or the file holds any other key. Paths are read from the Go module root.
+A repo excludes issues in `go_lint.yml` at its Go module root. Each entry is a golangci-lint exclusion rule (`path`, `path-except`, `linters`, `text`, `source`) with a `reason`. go-lint fails when an entry has no reason or the file holds any other key. Paths are read from the Go module root.
 
 ```yaml
 exclusions:
@@ -102,7 +102,7 @@ It reports:
 - an import of an HTTP server framework (fiber, gin, echo, chi, gorilla/mux, httprouter) outside `entrypoints/`, in a test file too. The HTTP controller is the entrypoint's adapter, at `entrypoints/<name>/http`;
 - a use of `net/http`'s server names outside `entrypoints/`: `Handler`, `HandlerFunc`, `ResponseWriter`, `ServeMux`, `NewServeMux`, `Server`, `ListenAndServe`, `ListenAndServeTLS`, `Serve`, `ServeTLS`, `Handle` and `HandleFunc`. A middleware of the form `func(http.Handler) http.Handler` is part of that adapter too. A client keeps `net/http`'s `Request`, `Client` and `RoundTripper`, and a test may start an `httptest` server to fake an outside API.
 
-A test file, in `cmd/` too, is held only to the surface rule and the HTTP server framework rule, so an integration test may import `infra`. The analyzer also reads a package's files for other systems and build tags. It cannot see a folder whose every file the host's build leaves out, such as a package only for Windows: run `GOOS=windows go-lint run ./...` to check one. A package outside the layers and `cmd/` goes unchecked.
+A test file, in `cmd/` too, is held only to the surface rule and the HTTP server framework rule, so an integration test may import `infra`. The analyzer also reads a package's files for other systems and build tags. It cannot see a folder whose every file the host's build leaves out, such as a package only for Windows: run `GOOS=windows go_lint run ./...` to check one. A package outside the layers and `cmd/` goes unchecked.
 
 ## Release
 
