@@ -1,0 +1,4 @@
+exclusions:
+  - path: features/b/
+    linters: [errcheck]
+    reason: the fixture's own exclusion, which the test expects go-lint to apply

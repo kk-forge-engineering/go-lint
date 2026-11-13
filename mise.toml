@@ -1,0 +1,45 @@
+[tools]
+go = "1"
+
+[tasks.setup]
+description = "Download the Go modules"
+run = "go mod download"
+
+[tasks.check]
+description = "The gate before a commit: the linters, the build and the tests"
+depends = ["lint", "build", "test"]
+
+[tasks."check:ci"]
+description = "check with coverage, as CI runs it"
+depends = ["lint", "build", "test:ci"]
+
+[tasks.build]
+description = "Build every package (keeps no binary)"
+run = "go build ./..."
+
+[tasks.lint]
+description = "go-lint from this checkout over its own code: the linters and the formatting"
+run = "go run ./cmd/go-lint run ./..."
+
+[tasks."lint:fix"]
+description = "Format the code with go-lint from this checkout"
+run = "go run ./cmd/go-lint fmt"
+
+[tasks.test]
+description = "The tests"
+run = "go test ./..."
+
+[tasks."test:ci"]
+description = "The tests with coverage into coverage/coverage.out; a total under 80% fails"
+# The end-to-end test runs a go-lint binary built with coverage, which writes into the same folder as the tests.
+run = [
+  "rm -rf coverage && mkdir -p coverage/raw",
+  "go test -cover -coverpkg=./... ./... -args -test.gocoverdir=$PWD/coverage/raw",
+  "go tool covdata textfmt -i=coverage/raw -o=coverage/coverage.out",
+  "go tool cover -func=coverage/coverage.out | awk '/^total:/ { t = $3 + 0; print } END { exit (t < 80) }'",
+]
+
+[tasks.version]
+description = "Print the release number in VERSION"
+quiet = true
+run = "cat VERSION"

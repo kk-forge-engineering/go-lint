@@ -1,0 +1,76 @@
+# The golangci-lint configuration go-lint runs with. README.md gives the reason for each linter.
+version: "2"
+run:
+  # Paths in a project's exclusions are read from the Go module root, not from this file's folder.
+  relative-path-mode: gomod
+issues:
+  # Every issue shows, so fixing one never reveals another on the next run.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false
+linters:
+  default: none
+  enable:
+    - layers
+    - errcheck
+    - govet
+    - staticcheck
+    - ineffassign
+    - unused
+    - gocritic
+    - bodyclose
+    - errorlint
+    - nilerr
+    - nilnesserr
+    - rowserrcheck
+    - makezero
+    - asasalint
+    - bidichk
+    - gocheckcompilerdirectives
+    - reassign
+    - nosprintfhostport
+    - fatcontext
+    - testableexamples
+    - nolintlint
+    - gochecknoinits
+    - noctx
+    - gosec
+  settings:
+    custom:
+      layers:
+        type: module
+        description: holds a Go module to the layers of the KK Forge architecture standard
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
+    staticcheck:
+      checks: ["SA*"]
+    gocritic:
+      enabled-tags: [diagnostic]
+      disabled-tags: [style, performance, opinionated]
+      disabled-checks: [weakCond, filepathJoin, sloppyReassign]
+    errorlint:
+      errorf: false
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    gosec:
+      includes: [G108, G112, G114, G124, G201, G202, G401, G402, G403, G405, G406, G407]
+      # gosec ignores its own `#nosec` comments, so an issue is silenced only by a `//nolint` with a reason.
+      config:
+        global:
+          nosec: true
+  exclusions:
+    rules:
+      # A test runs under its own deadline and serves no traffic, so cancellation and attack surface do not apply.
+      - path: _test\.go$
+        linters: [noctx, gosec]
+formatters:
+  enable:
+    - gofumpt
+    - gci
+  settings:
+    gci:
+      sections: [standard, default, localmodule]
