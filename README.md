@@ -9,7 +9,7 @@ Add go-lint to the repo's `mise.toml`. mise builds it with `go install`, in its 
 ```toml
 [tools]
 go = "1"
-"go:github.com/kk-forge-engineering/go-lint/cmd/go-lint" = "1.0.0"
+"go:github.com/kk-forge-engineering/go-lint/cmd/go-lint" = "1.0.1"
 
 [tasks.lint]
 run = "go-lint run ./..."
@@ -25,6 +25,8 @@ run = "go-lint fmt"
 - `go-lint fmt [paths]` formats the code.
 
 go-lint refuses to run beside a `.golangci.yml`, `.yaml`, `.toml` or `.json` at the Go module root.
+
+go-lint refuses a module whose path has no dot in its first element, such as `idea_packer`. gofumpt takes an import of such a path for the standard library unless it starts like the module's own path, and gci groups it apart, so where one such module imports another, `go-lint run` refuses what `go-lint fmt` writes. Name the module after its repository, such as `github.com/kk-forge-engineering/<repo>`.
 
 ## Exclusions
 

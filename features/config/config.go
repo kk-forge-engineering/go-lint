@@ -1,5 +1,5 @@
 // Package config builds the golangci-lint configuration go-lint runs with: the set built into go-lint, plus the
-// exclusions in the project's go-lint.yml.
+// module's path and the exclusions in the project's go-lint.yml.
 package config
 
 import (
@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"go.yaml.in/yaml/v3"
+	"golang.org/x/mod/modfile"
 )
 
 // fileName is the file at the Go module root that holds the project's exclusions.
@@ -29,14 +30,18 @@ type exclusion struct {
 	Source     string   `yaml:"source,omitempty"`
 }
 
-// For returns the configuration for the Go module at the root of module. It fails when the module
-// keeps a golangci-lint configuration of its own, or when go-lint.yml holds an unknown key or an
-// exclusion without a reason.
+// For returns the configuration for the Go module at the root of module. It fails when the module's path in go.mod is
+// missing or has no dot in its first element, when the module keeps a golangci-lint configuration of its own, or when
+// go-lint.yml holds an unknown key or an exclusion without a reason.
 func For(module fs.FS) ([]byte, error) {
 	for _, name := range []string{".golangci.yml", ".golangci.yaml", ".golangci.toml", ".golangci.json"} {
 		if _, err := fs.Stat(module, name); err == nil {
 			return nil, fmt.Errorf("go-lint reads no %s: delete it, and put the project's exclusions in %s", name, fileName)
 		}
+	}
+	path, err := modulePath(module)
+	if err != nil {
+		return nil, err
 	}
 	exclusions, err := readExclusions(module)
 	if err != nil {
@@ -52,7 +57,32 @@ func For(module fs.FS) ([]byte, error) {
 		rule.Reason = ""
 		rules["rules"] = append(rules["rules"].([]any), rule)
 	}
+	// gofumpt formats as `gofumpt` run in the module does: with the module's path, which go.mod gives the gofumpt
+	// command.
+	formatters := config["formatters"].(map[string]any)
+	settings := formatters["settings"].(map[string]any)
+	settings["gofumpt"] = map[string]any{"module-path": path}
 	return yaml.Marshal(config)
+}
+
+// modulePath returns the module path in go.mod. It refuses a path without a dot in its first element, such as
+// idea_packer: gofumpt takes an import of such a path for the standard library unless it starts like the module's
+// own, and gci groups it apart, so where one such module imports another, go-lint run refuses what go-lint fmt
+// writes.
+func modulePath(module fs.FS) (string, error) {
+	data, err := fs.ReadFile(module, "go.mod")
+	if err != nil {
+		return "", err
+	}
+	path := modfile.ModulePath(data)
+	if path == "" {
+		return "", errors.New("go.mod declares no module path")
+	}
+	if first, _, _ := strings.Cut(path, "/"); !strings.Contains(first, ".") {
+		return "", fmt.Errorf("module path %s has no dot in its first element: name the module after its repository, "+
+			"such as github.com/kk-forge-engineering/<repo>", path)
+	}
+	return path, nil
 }
 
 // readExclusions returns the exclusions in go-lint.yml, or none when the file does not exist.
