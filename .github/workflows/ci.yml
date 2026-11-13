@@ -1,9 +1,11 @@
 name: CI
 on:
+  # A branch runs CI through its PR, once per push, and SonarQube analyses it as that PR. main runs it on its own
+  # push: SonarQube compares each PR with main's analysis.
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
-    types: [opened, reopened]
+    types: [opened, synchronize, reopened]
 jobs:
   ci:
     uses: kk-forge-engineering/gh-actions/.github/workflows/ci.yml@v4
