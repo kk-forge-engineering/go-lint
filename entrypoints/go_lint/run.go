@@ -80,7 +80,11 @@ func prepare(args []string) error {
 	if err != nil {
 		return err
 	}
-	data, err := config.For(os.DirFS(root))
+	importsKey, err := layers.ImportsKey(root)
+	if err != nil {
+		return err
+	}
+	data, err := config.For(os.DirFS(root), importsKey)
 	if err != nil {
 		return err
 	}

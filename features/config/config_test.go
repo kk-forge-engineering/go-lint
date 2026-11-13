@@ -20,7 +20,7 @@ func TestForAddsEachExclusionWithoutItsReason(t *testing.T) {
     reason: the tools are throwaway scripts
 `)}}
 
-	data, err := config.For(module)
+	data, err := config.For(module, "key")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestForFails(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			module := fstest.MapFS{"go.mod": goMod, test.file: {Data: []byte(test.content)}}
-			_, err := config.For(module)
+			_, err := config.For(module, "key")
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Errorf("For() error = %v, want one containing %q", err, test.want)
 			}
@@ -85,8 +85,33 @@ func TestForFails(t *testing.T) {
 	}
 }
 
+func TestForPassesTheImportsKeyToTheLayersLinter(t *testing.T) {
+	data, err := config.For(fstest.MapFS{"go.mod": goMod}, "key")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got struct {
+		Linters struct {
+			Settings struct {
+				Custom struct {
+					Layers struct {
+						Settings map[string]string `yaml:"settings"`
+					} `yaml:"layers"`
+				} `yaml:"custom"`
+			} `yaml:"settings"`
+		} `yaml:"linters"`
+	}
+	if err := yaml.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if key := got.Linters.Settings.Custom.Layers.Settings["imports"]; key != "key" {
+		t.Errorf("layers settings imports = %q, want %q", key, "key")
+	}
+}
+
 func TestForWithoutGoLintYmlKeepsTheBuiltInSet(t *testing.T) {
-	data, err := config.For(fstest.MapFS{"go.mod": goMod})
+	data, err := config.For(fstest.MapFS{"go.mod": goMod}, "key")
 	if err != nil {
 		t.Fatal(err)
 	}

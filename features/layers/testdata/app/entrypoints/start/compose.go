@@ -2,6 +2,7 @@ package start
 
 import (
 	_ "example.com/app"
+	_ "example.com/app/entities/lone"
 	_ "example.com/app/entities/user"
 	_ "example.com/app/features/a"
 	_ "example.com/app/infra/db"

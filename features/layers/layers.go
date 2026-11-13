@@ -18,9 +18,10 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Analyzer reports each import that breaks the layer table or another module's surface, and each cmd/ package that is
-// more than a launcher. It reads the files of other systems and build tags too. It holds a test file only to the
-// module surfaces and the ban on HTTP server frameworks. README.md lists the rules.
+// Analyzer reports each import that breaks the layers or another module's surface, and each cmd/
+// package that is more than a launcher. It reports each entities module that fewer than two modules
+// of features, orchestration and entities import, and each orchestration module that imports fewer
+// than two features. It holds a test file only to the module surfaces and the HTTP framework ban.
 var Analyzer = &analysis.Analyzer{
 	Name: "layers",
 	Doc:  "holds a Go module to the layers of the KK Forge architecture standard",
@@ -61,21 +62,24 @@ func isServerFramework(importPath string) bool {
 var published = []string{"orchestration", "features", "entities"}
 
 func run(pass *analysis.Pass) (any, error) {
+	var module goModule
+	var packageDir string
 	for _, file := range allFiles(pass) {
 		name := pass.Fset.Position(file.Package).Filename
 		// The loop skips a file outside any Go module. The go tool writes cgo's files and
 		// a test binary's main package into its build cache, outside the layers.
-		module, err := moduleOf(filepath.Dir(name))
+		found, err := moduleOf(filepath.Dir(name))
 		if err != nil {
 			continue
 		}
-		rel, err := filepath.Rel(module.root, filepath.Dir(name))
+		rel, err := filepath.Rel(found.root, filepath.Dir(name))
 		if err != nil {
 			return nil, err
 		}
-		checkFile(pass, module, filepath.ToSlash(rel), file, strings.HasSuffix(name, "_test.go"))
+		module, packageDir = found, filepath.ToSlash(rel)
+		checkFile(pass, module, packageDir, file, strings.HasSuffix(name, "_test.go"))
 	}
-	return nil, nil
+	return nil, checkModule(pass, module, packageDir)
 }
 
 func checkFile(pass *analysis.Pass, module goModule, dir string, file *ast.File, isTest bool) {
@@ -163,7 +167,7 @@ func allFiles(pass *analysis.Pass) []*ast.File {
 		if !strings.HasSuffix(ignored, ".go") {
 			continue
 		}
-		file, err := parser.ParseFile(pass.Fset, ignored, nil, parser.SkipObjectResolution)
+		file, err := parser.ParseFile(pass.Fset, ignored, nil, parser.SkipObjectResolution|parser.ParseComments)
 		if err != nil {
 			continue
 		}
