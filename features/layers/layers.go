@@ -244,6 +244,11 @@ func (m goModule) importProblem(from place, spec *ast.ImportSpec, isTest, isComp
 	if to.isFeatureInfra() && dir == to.module+"/infra" && (isCompose || isTest) {
 		return ""
 	}
+	// A test also imports a surface's test kit, the package <name>_testing right inside it, as in
+	// features/batch/infra/infra_testing for the surface features/batch/infra.
+	if isTest && (isTestKit(dir, to.module) || to.isFeatureInfra() && isTestKit(dir, to.module+"/infra")) {
+		return ""
+	}
 	if slices.Contains(published, to.layer) && dir != to.module {
 		return fmt.Sprintf("import %s/%s, not its inner package %s", m.path, to.module, importPath)
 	}
@@ -337,4 +342,10 @@ func placeOf(dir string) *place {
 		return &place{layer: layer, module: layer, dir: dir}
 	}
 	return &place{layer: layer, module: layer + "/" + parts[1], dir: dir}
+}
+
+// isTestKit returns whether dir is the test kit of the package at surface: the package <name>_testing directly inside
+// it, where <name> is the surface's own folder name.
+func isTestKit(dir, surface string) bool {
+	return dir == surface+"/"+path.Base(surface)+"_testing"
 }
