@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 	// Under `mise run test:ci` the binary writes its coverage beside the tests', so the code it runs counts.
 	flag.Parse()
 	if coverDir := flag.Lookup("test.gocoverdir"); testing.CoverMode() != "" && coverDir.Value.String() != "" {
-		args = append(args, "-cover", "-coverpkg=github.com/kk-forge-engineering/go-lint/v2/...")
+		args = append(args, "-cover", "-coverpkg=github.com/kk-forge-engineering/go-lint/v3/...")
 		_ = os.Setenv("GOCOVERDIR", coverDir.Value.String())
 	}
 	build := exec.Command("go", append(args, "../../cmd/go_lint")...)
@@ -70,14 +70,15 @@ func goLint(t *testing.T, args ...string) (string, int) {
 	return goLintIn(t, "testdata/consumer", t.TempDir(), args...)
 }
 
-// goLintIn runs go-lint in dir, with home as the user's home folder, which holds the user's cache.
+// goLintIn runs go-lint in dir, with home as the user's home folder, which holds the user's caches, golangci-lint's
+// included.
 func goLintIn(t *testing.T, dir, home string, args ...string) (string, int) {
 	t.Helper()
 	command := exec.Command(binary, args...)
 	command.Dir = dir
 	// The go tool's caches stay where they are, so the run compiles nothing again.
 	command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, ".cache"),
-		"GOCACHE="+goEnv["GOCACHE"], "GOMODCACHE="+goEnv["GOMODCACHE"], "GOLANGCI_LINT_CACHE="+t.TempDir())
+		"GOCACHE="+goEnv["GOCACHE"], "GOMODCACHE="+goEnv["GOMODCACHE"], "GOLANGCI_LINT_CACHE="+filepath.Join(home, "golangci-lint"))
 	output, err := command.CombinedOutput()
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
@@ -153,6 +154,35 @@ func TestRunReplacesAConfigurationFileFoundInItsCache(t *testing.T) {
 
 	if code != 1 || !strings.Contains(output, "(layers)") {
 		t.Errorf("go_lint run over a planted configuration exited %d, want 1 with the layers issue\n%s", code, output)
+	}
+}
+
+// golangci-lint keys the cached result of a package on its own files and its imports. The result of an entities
+// package also depends on the packages that import it, so a second run must not reuse it.
+func TestRunReportsAnEntityThatLostAConsumerSinceTheCachedRun(t *testing.T) {
+	module, home := t.TempDir(), t.TempDir()
+	write := func(path, content string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(module, path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(module, path), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("go.mod", "module example.com/shift\n\ngo 1.26.0\n")
+	write("entities/user/user.go", "package user\n")
+	write("features/a/a.go", "package a\n\nimport _ \"example.com/shift/entities/user\"\n")
+	write("features/b/b.go", "package b\n\nimport _ \"example.com/shift/entities/user\"\n")
+	if output, code := goLintIn(t, module, home, "run", "./..."); code != 0 {
+		t.Fatalf("go-lint run with two consumers exited %d, want 0\n%s", code, output)
+	}
+
+	write("features/b/b.go", "package b\n")
+	output, code := goLintIn(t, module, home, "run", "./...")
+
+	if code != 1 || !strings.Contains(output, "only features/a imports entities/user") {
+		t.Errorf("go-lint run after features/b dropped entities/user exited %d, want 1 with its report\n%s", code, output)
 	}
 }
 

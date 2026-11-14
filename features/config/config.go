@@ -30,10 +30,11 @@ type exclusion struct {
 	Source     string   `yaml:"source,omitempty"`
 }
 
-// For returns the configuration for the Go module at the root of module. It fails when the module's path in go.mod is
-// missing or has no dot in its first element, when the module keeps a golangci-lint configuration of its own, or when
-// go_lint.yml holds an unknown key or an exclusion without a reason.
-func For(module fs.FS) ([]byte, error) {
+// For returns the configuration for the Go module at the root of module. It sets importsKey on the layers linter.
+// golangci-lint keys its cached results on the settings, so it drops them when the module's imports change. It fails
+// on a go.mod module path that is missing or has no dot in its first element, on a .golangci file in the module, or
+// on a bad go_lint.yml.
+func For(module fs.FS, importsKey string) ([]byte, error) {
 	for _, name := range []string{".golangci.yml", ".golangci.yaml", ".golangci.toml", ".golangci.json"} {
 		if _, err := fs.Stat(module, name); err == nil {
 			return nil, fmt.Errorf("go-lint reads no %s: delete it, and put the project's exclusions in %s", name, fileName)
@@ -62,6 +63,8 @@ func For(module fs.FS) ([]byte, error) {
 	formatters := config["formatters"].(map[string]any)
 	settings := formatters["settings"].(map[string]any)
 	settings["gofumpt"] = map[string]any{"module-path": path}
+	layers := linters["settings"].(map[string]any)["custom"].(map[string]any)["layers"].(map[string]any)
+	layers["settings"] = map[string]any{"imports": importsKey}
 	return yaml.Marshal(config)
 }
 

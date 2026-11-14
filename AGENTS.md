@@ -6,4 +6,4 @@
 - A rule change in `layers` adds a case with a `// want` comment to `features/layers/testdata/app`, and updates README.md → layers.
 - README.md → Use lists the flags in `forbidden` in `entrypoints/go_lint/run.go` and the golangci-lint files `features/config/config.go` refuses. A change to either list updates it.
 - `entrypoints/go_lint/run_test.go` runs a built go-lint on `testdata/consumer` and expects each issue by file, line and linter, and runs `go_lint vuln` on `testdata/vulnerable`, which needs the network.
-- README.md → Release gives the release steps.
+- README.md → Release gives the release steps. A change that fails code the last release passed is a new major, with the module path's `/v<major>`.
