@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -29,17 +30,12 @@ func TestMain(m *testing.M) {
 	// Under `mise run test:ci` the binary writes its coverage beside the tests', so the code it runs counts.
 	flag.Parse()
 	if coverDir := flag.Lookup("test.gocoverdir"); testing.CoverMode() != "" && coverDir.Value.String() != "" {
-		args = append(args, "-cover", "-coverpkg=github.com/kk-forge-engineering/go-lint/v3/...")
+		args = append(args, "-cover", "-coverpkg=github.com/kk-forge-engineering/go-lint/v4/...")
 		_ = os.Setenv("GOCOVERDIR", coverDir.Value.String())
 	}
 	build := exec.Command("go", append(args, "../../cmd/go_lint")...)
 	build.Stderr = os.Stderr
 	if err := build.Run(); err != nil {
-		panic(err)
-	}
-	// The test reads the modules in testdata, so an edit to one runs the tests again. go test keys its cache only on
-	// the files the test process opens, and go-lint reads a module in a process of its own.
-	if err := readAll("testdata"); err != nil {
 		panic(err)
 	}
 	for _, name := range []string{"GOCACHE", "GOMODCACHE"} {
@@ -70,10 +66,26 @@ func goLint(t *testing.T, args ...string) (string, int) {
 	return goLintIn(t, "testdata/consumer", t.TempDir(), args...)
 }
 
+// readInputs reads, once per test process, every file a go_lint run depends on. go test keys its cache only on the
+// files the test process opens, and only from m.Run on, while go_lint reads a module in a process of its own and is
+// built by go build, which go test does not see. Reading the testdata modules and go_lint's own source here lets an
+// edit to either run the tests again.
+var readInputs = sync.OnceValue(func() error {
+	for _, dir := range []string{"testdata", "../../features", "../../infra", "../../entrypoints", "../../cmd"} {
+		if err := readAll(dir); err != nil {
+			return err
+		}
+	}
+	return nil
+})
+
 // goLintIn runs go-lint in dir, with home as the user's home folder, which holds the user's caches, golangci-lint's
 // included.
 func goLintIn(t *testing.T, dir, home string, args ...string) (string, int) {
 	t.Helper()
+	if err := readInputs(); err != nil {
+		t.Fatal(err)
+	}
 	command := exec.Command(binary, args...)
 	command.Dir = dir
 	// The go tool's caches stay where they are, so the run compiles nothing again.
@@ -183,6 +195,36 @@ func TestRunReportsAnEntityThatLostAConsumerSinceTheCachedRun(t *testing.T) {
 
 	if code != 1 || !strings.Contains(output, "only features/a imports entities/user") {
 		t.Errorf("go-lint run after features/b dropped entities/user exited %d, want 1 with its report\n%s", code, output)
+	}
+}
+
+// A feature's infra may import only the entities its port imports. When the port drops one, the feature's own imports
+// stay the same, so only the port's imports in the cache key make the second run report the infra's import.
+func TestRunReportsAFeatureInfraImportThePortDroppedSinceTheCachedRun(t *testing.T) {
+	module, home := t.TempDir(), t.TempDir()
+	write := func(path, content string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(module, path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(module, path), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("go.mod", "module example.com/shift\n\ngo 1.26.0\n")
+	write("entities/user/user.go", "package user\n")
+	write("features/a/port/port.go", "package port\n\nimport _ \"example.com/shift/entities/user\"\n")
+	write("features/a/infra/infra.go", "package infra\n\nimport _ \"example.com/shift/entities/user\"\n")
+	write("features/b/b.go", "package b\n\nimport _ \"example.com/shift/entities/user\"\n")
+	if output, code := goLintIn(t, module, home, "run", "./..."); code != 0 {
+		t.Fatalf("go-lint run with the port naming entities/user exited %d, want 0\n%s", code, output)
+	}
+
+	write("features/a/port/port.go", "package port\n")
+	output, code := goLintIn(t, module, home, "run", "./...")
+
+	if code != 1 || !strings.Contains(output, "a feature's infra imports only the entities its port features/a/port imports") {
+		t.Errorf("go-lint run after the port dropped entities/user exited %d, want 1 with its report\n%s", code, output)
 	}
 }
 

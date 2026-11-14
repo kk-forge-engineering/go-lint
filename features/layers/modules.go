@@ -19,8 +19,9 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// scannedLayers lists the layers whose imports the module-wide checks count. An entrypoint or an infra adapter that
-// imports an entity uses it on behalf of a feature, and a test follows its code, so none of them shares an entity.
+// scannedLayers lists the layers whose imports the module-wide checks count. An entrypoint takes an entity's type from
+// a feature, and a test follows its code, so neither shares an entity. A feature's infra sits in its feature and counts
+// as the feature, and the root infra imports no entity.
 var scannedLayers = []string{"features", "orchestration", "entities"}
 
 // moduleImports maps each module of scannedLayers, by its folder from the Go module root, to the other modules of
@@ -33,7 +34,9 @@ var scans sync.Map
 type scan struct {
 	once    sync.Once
 	imports moduleImports
-	err     error
+	// ports maps each feature module to the entities modules its port package, features/<x>/port, imports.
+	ports moduleImports
+	err   error
 }
 
 // importsOf returns the module imports of the Go module. It reads every file in features, orchestration and entities,
@@ -42,12 +45,23 @@ type scan struct {
 func importsOf(module goModule) (moduleImports, error) {
 	entry, _ := scans.LoadOrStore(module.root, &scan{})
 	cached := entry.(*scan)
-	cached.once.Do(func() { cached.imports, cached.err = scanImports(module) })
+	cached.once.Do(func() { cached.imports, cached.ports, cached.err = scanImports(module) })
 	return cached.imports, cached.err
 }
 
-func scanImports(module goModule) (moduleImports, error) {
+// portsOf returns, per feature module, the entities modules its port package imports: the entities that feature's
+// infra may import.
+func portsOf(module goModule) (moduleImports, error) {
+	if _, err := importsOf(module); err != nil {
+		return nil, err
+	}
+	entry, _ := scans.Load(module.root)
+	return entry.(*scan).ports, nil
+}
+
+func scanImports(module goModule) (moduleImports, moduleImports, error) {
 	found := moduleImports{}
+	ports := moduleImports{}
 	fset := token.NewFileSet()
 	for _, layer := range scannedLayers {
 		layerRoot := filepath.Join(module.root, layer)
@@ -70,21 +84,24 @@ func scanImports(module goModule) (moduleImports, error) {
 				isIgnoredName(name) {
 				return nil
 			}
-			return scanFile(module, fset, path, found)
+			return scanFile(module, fset, path, found, ports)
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	for _, modules := range found {
 		slices.Sort(modules)
 	}
-	return found, nil
+	for _, modules := range ports {
+		slices.Sort(modules)
+	}
+	return found, ports, nil
 }
 
-// scanFile adds the features and entities modules that one file imports to found. It skips a file of package main,
-// and a file that does not parse, which the compiler reports.
-func scanFile(module goModule, fset *token.FileSet, path string, found moduleImports) error {
+// scanFile adds the features and entities modules that one file imports to found. It skips a file of package main or
+// of a test kit, and a file that does not parse, which the compiler reports.
+func scanFile(module goModule, fset *token.FileSet, path string, found, ports moduleImports) error {
 	rel, err := filepath.Rel(module.root, filepath.Dir(path))
 	if err != nil {
 		return err
@@ -94,7 +111,7 @@ func scanFile(module goModule, fset *token.FileSet, path string, found moduleImp
 		return nil
 	}
 	file, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
-	if err != nil || file.Name.Name == "main" {
+	if err != nil || file.Name.Name == "main" || strings.HasSuffix(file.Name.Name, "_testing") {
 		return nil //nolint:nilerr // The compiler reports a file that does not parse.
 	}
 	for _, spec := range file.Imports {
@@ -104,11 +121,15 @@ func scanFile(module goModule, fset *token.FileSet, path string, found moduleImp
 			continue
 		}
 		to := placeOf(dir)
-		if to == nil || (to.layer != "entities" && to.layer != "features") || to.module == from.module ||
-			slices.Contains(found[from.module], to.module) {
+		if to == nil || (to.layer != "entities" && to.layer != "features") || to.module == from.module {
 			continue
 		}
-		found[from.module] = append(found[from.module], to.module)
+		if from.isPort() && to.layer == "entities" && !slices.Contains(ports[from.module], to.module) {
+			ports[from.module] = append(ports[from.module], to.module)
+		}
+		if !slices.Contains(found[from.module], to.module) {
+			found[from.module] = append(found[from.module], to.module)
+		}
 	}
 	return nil
 }
@@ -227,7 +248,7 @@ func reportOrchestration(pass *analysis.Pass, file *ast.File, orchestration stri
 
 // ImportsKey returns a key of the imports the module-wide checks of the Go module at root count. It changes whenever a
 // module starts or stops importing a feature or an entity, so a cache of results can key on it.
-func ImportsKey(root string) (string, error) {
+func (*UseCases) ImportsKey(root string) (string, error) {
 	module, err := moduleOf(root)
 	if err != nil {
 		return "", err
@@ -236,9 +257,17 @@ func ImportsKey(root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	ports, err := portsOf(module)
+	if err != nil {
+		return "", err
+	}
 	var text strings.Builder
 	for _, from := range slices.Sorted(maps.Keys(imports)) {
 		text.WriteString(from + ":" + strings.Join(imports[from], ",") + "\n")
+	}
+	// A feature's infra may import the entities its port imports, so the port's imports reach its result too.
+	for _, feature := range slices.Sorted(maps.Keys(ports)) {
+		text.WriteString("port " + feature + ":" + strings.Join(ports[feature], ",") + "\n")
 	}
 	sum := sha256.Sum256([]byte(text.String()))
 	return hex.EncodeToString(sum[:]), nil

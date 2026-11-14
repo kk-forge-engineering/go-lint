@@ -34,7 +34,7 @@ type exclusion struct {
 // golangci-lint keys its cached results on the settings, so it drops them when the module's imports change. It fails
 // on a go.mod module path that is missing or has no dot in its first element, on a .golangci file in the module, or
 // on a bad go_lint.yml.
-func For(module fs.FS, importsKey string) ([]byte, error) {
+func (*UseCases) For(module fs.FS, importsKey string) ([]byte, error) {
 	for _, name := range []string{".golangci.yml", ".golangci.yaml", ".golangci.toml", ".golangci.json"} {
 		if _, err := fs.Stat(module, name); err == nil {
 			return nil, fmt.Errorf("go-lint reads no %s: delete it, and put the project's exclusions in %s", name, fileName)
