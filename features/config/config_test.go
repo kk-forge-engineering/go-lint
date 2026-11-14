@@ -7,7 +7,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/kk-forge-engineering/go-lint/v2/features/config"
+	"github.com/kk-forge-engineering/go-lint/v3/features/config"
 )
 
 // goMod is the go.mod of the modules the tests build their configuration for.

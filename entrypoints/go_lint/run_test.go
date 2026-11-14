@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 	// Under `mise run test:ci` the binary writes its coverage beside the tests', so the code it runs counts.
 	flag.Parse()
 	if coverDir := flag.Lookup("test.gocoverdir"); testing.CoverMode() != "" && coverDir.Value.String() != "" {
-		args = append(args, "-cover", "-coverpkg=github.com/kk-forge-engineering/go-lint/v2/...")
+		args = append(args, "-cover", "-coverpkg=github.com/kk-forge-engineering/go-lint/v3/...")
 		_ = os.Setenv("GOCOVERDIR", coverDir.Value.String())
 	}
 	build := exec.Command("go", append(args, "../../cmd/go_lint")...)

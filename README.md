@@ -9,7 +9,7 @@ Add go-lint to the repo's `mise.toml`. Its command is `go_lint`: a name of sever
 ```toml
 [tools]
 go = "1"
-"go:github.com/kk-forge-engineering/go-lint/v2/cmd/go_lint" = "2"
+"go:github.com/kk-forge-engineering/go-lint/v3/cmd/go_lint" = "3"
 
 [tasks.lint]
 run = ["go_lint run ./...", "go_lint vuln ./..."]
@@ -108,4 +108,4 @@ A test file, in `cmd/` too, is held only to the surface rule and the HTTP server
 
 ## Release
 
-Raise `VERSION` in a PR. After the merge, the owner tags `v<VERSION>` on `main` and pushes the tag.
+Raise `VERSION` in a PR. A release that fails code the last release passed, such as a new rule, is a new major, and a new major changes the module path to `/v<major>` in `go.mod`, every import and the install key above. After the merge, the owner tags `v<VERSION>` on `main` and pushes the tag.
