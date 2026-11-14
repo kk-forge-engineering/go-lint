@@ -97,7 +97,8 @@ func checkFile(pass *analysis.Pass, module goModule, dir string, file *ast.File,
 			return
 		}
 		checkImports(pass, module, *from, file, isTest)
-		// A test may start an httptest server to fake an outside API.
+		// The check spares a test file, since a test may start an httptest server to fake an
+		// outside API.
 		if !isTest && from.layer != "entrypoints" {
 			checkHttpServer(pass, file)
 		}

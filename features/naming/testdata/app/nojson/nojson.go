@@ -8,5 +8,5 @@ type Count int
 // MarshalJSON keeps the name encoding/json calls.
 func (c Count) MarshalJSON() ([]byte, error) { return []byte(strconv.Itoa(int(c))), nil }
 
-// UnmarshalJSON keeps its name, though this signature is not json.Unmarshaler's.
+// UnmarshalJSON has a signature that is not json.Unmarshaler's, so the check reports its name.
 func (c *Count) UnmarshalJSON(string) error { return nil } // want `UnmarshalJSON: write each initialism as a word, as in UnmarshalJson`

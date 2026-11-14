@@ -1,5 +1,5 @@
-// Package naming is a go/analysis analyzer that holds Go identifiers to the KK Forge code style, which writes an
-// initialism as a word.
+// Package naming is a go/analysis analyzer for the KK Forge code style, which writes an initialism in a name as a word:
+// HostUrl, not HostURL.
 package naming
 
 import (
@@ -13,11 +13,11 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Analyzer reports each identifier a package declares with an initialism in capitals, as in HostURL, and each import
-// alias that is not camelCase. README.md gives the rules and what the analyzer leaves alone.
+// Analyzer reports each name a package declares that writes an initialism in capitals, as HostURL does, and each
+// import alias that is not camelCase. README.md gives the rules and what the analyzer leaves alone.
 var Analyzer = &analysis.Analyzer{
 	Name: "naming",
-	Doc:  "reports an initialism written in capitals in an identifier: HostUrl, not HostURL",
+	Doc:  "checks that a name writes an initialism as a word: HostUrl, not HostURL",
 	Run:  run,
 }
 
@@ -183,7 +183,6 @@ func signatureOf(signature *types.Signature) string {
 		unnamed(signature.Results()), signature.Variadic()), nil)
 }
 
-// unnamed returns a tuple's types without their names.
 func unnamed(tuple *types.Tuple) *types.Tuple {
 	vars := make([]*types.Var, tuple.Len())
 	for i := range vars {

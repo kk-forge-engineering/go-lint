@@ -100,12 +100,13 @@ func TestRunReportsTheAnalyzersAndAppliesTheProjectExclusions(t *testing.T) {
 		got = append(got, match[1]+" "+match[2])
 	}
 	slices.Sort(got)
-	// features/b's errcheck issue is excluded by testdata/consumer/go_lint.yml, and the request and TLS setting in features/f's
-	// tests by the built-in exclusion for test files.
+	// The want list leaves out issues that the exclusions drop. `testdata/consumer/go_lint.yml`
+	// excludes the errcheck issue in `features/b`. The built-in exclusion for test files drops the
+	// request and the TLS setting in the tests of `features/f`.
 	want := []string{
 		"features/a/a.go:3 layers", "features/c/c.go:7 nolintlint", "features/d/d.go:7 nolintlint",
 		"features/f/f.go:13 noctx", "features/f/f.go:7 gochecknoinits", "features/f/tls.go:12 gosec",
-		"features/f/tls.go:7 gosec", "features/g/g.go:7 naming",
+		"features/f/tls.go:7 gosec", "features/g/g.go:9 naming",
 	}
 	if code != 1 || !slices.Equal(got, want) {
 		t.Errorf("go_lint run exited %d with issues %v, want 1 with %v\n%s", code, got, want, output)

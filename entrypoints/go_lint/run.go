@@ -65,7 +65,8 @@ func cacheVersion() string {
 	return "(devel)"
 }
 
-// prepare checks the arguments, writes the configuration and sets the arguments golangci-lint reads.
+// prepare checks the arguments, writes the configuration and registers go-lint's analyzers.
+// It then sets `os.Args` to the command line golangci-lint reads.
 func prepare(args []string) error {
 	if len(args) == 0 || (args[0] != "run" && args[0] != "fmt") {
 		return fmt.Errorf("unknown command\n%s", usage)
@@ -174,8 +175,8 @@ func (p typesPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
 	return []*analysis.Analyzer{p.analyzer}, nil
 }
 
-// GetLoadMode asks for type information. layers reads the names of imported packages from it, and naming reads the
-// interfaces those packages declare.
+// GetLoadMode asks for type information. layers reads the names of imported packages from it, and
+// naming reads the interfaces those packages declare.
 func (typesPlugin) GetLoadMode() string {
 	return register.LoadModeTypesInfo
 }

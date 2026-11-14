@@ -2,5 +2,4 @@
 
 package names
 
-// GeneratedURL keeps the generator's name.
 var GeneratedURL = 1

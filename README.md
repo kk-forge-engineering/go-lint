@@ -49,7 +49,7 @@ A linter is in the set when it catches a bug or a security hole and rarely repor
 | Linter | Catches |
 |---|---|
 | `layers` | an import against the layer table or another module's surface, and a `cmd/` package that is more than a launcher (below) |
-| `naming` | an initialism written in capitals, as in `HostURL`, and an import alias that is not camelCase (below) |
+| `naming` | a name that writes an initialism in capitals, as `HostURL` does where the style asks for `HostUrl`, and an import alias that is not camelCase (below) |
 | `errcheck` | an error dropped without a word. Write `_ =` where dropping it is meant |
 | `govet` | what every vet analyzer catches. Two stay off: `fieldalignment` reorders fields to save memory, and `shadow` reports the idiomatic shadowed `err` |
 | `staticcheck` | its `SA` bug checks. The `S1` simplifications, `ST` style checks and `QF` quick fixes stay off. `ST1003` would ask for `HostURL`, the opposite of `naming` |
@@ -109,19 +109,24 @@ A test file, in `cmd/` too, is held only to the surface rule and the HTTP server
 
 ## naming
 
-The KK Forge code style writes an initialism as a word, in Go too, against Go's own habit: `HostUrl`, `userId`, `ParseJson`, not `HostURL`, `userID`, `ParseJSON`. naming reports:
+The KK Forge code style writes an initialism in a name as a word: `HostUrl`, `userId`, `ParseJson`, not `HostURL`, `userID`, `ParseJSON`. This holds in Go too, though Go's own code writes initialisms in capitals. naming reports:
 
-- a type, function, method, variable, constant, field, type parameter or label whose name writes an initialism in capitals. The report gives the name written as words. `ReadsAValue` passes: two capitals before a lower-case letter are a one-letter word and the next word. A lone `s` after an initialism is its plural, so `userIDs` gives `userIds`;
+- a name that writes an initialism in capitals: a type, function, method, variable, constant, field, type parameter or label. The report gives the name written as words, as `HostUrl` for `HostURL`. `ReadsAValue` passes: two capitals before a lower-case letter are a one-letter word and the next word. A lone `s` after an initialism is its plural, so `userIDs` gives `userIds`;
 - an import alias with an initialism in capitals, or one that is not camelCase, such as `server_url` or `ServerUrl`.
 
 It leaves alone:
 
-- a method with the name and signature of a method of another package's interface, such as `ServeHTTP` of `net/http`'s `Handler`. That package chose the name. naming finds the interfaces of the packages the code imports and of those their exported declarations use, and knows all of the standard library's: `encoding/json` calls `MarshalJSON` on any value that has it, so the method may sit in a package that never imports `encoding/json`. An interface of another library the code does not import, such as a YAML library's `MarshalYAML`, takes `//nolint:naming // implements yaml.Marshaler`;
+- a method that implements another package's interface, such as `ServeHTTP` of `net/http`'s `Handler`, because that package chose the name. naming looks for the interfaces in the packages the code imports, and in the packages their exported declarations use. It also knows every interface of the standard library: `encoding/json` calls `MarshalJSON` on any value that has it, even in a package that never imports `encoding/json`. For an interface of a library the code does not import, such as a YAML library's `MarshalYAML`, write `//nolint:naming // implements yaml.Marshaler`;
 - an embedded field, which takes its type's name;
 - a file marked as generated;
-- a struct tag, which is not an identifier. An exported field without a tag gives `encoding/json` its key, so renaming `UserID` to `UserId` changes the key it writes: give the field a tag that keeps the key.
+- a struct tag, which is not a name. An exported field without a tag gives `encoding/json` its key, so renaming `UserID` to `UserId` changes the key it writes: give the field a tag that keeps the key.
 
-naming cannot tell `serverhttp`, two words joined, from one word, so a code reviewer checks that an import alias of several words is camelCase. Nor can it see the initialism `IP` in `IPv4`: it reads `I` and `Pv4`, so review asks for `Ipv4`. It reads a lone `s` after capitals as a plural, so for `URLIsValid` it suggests `UrlisValid`, and it reports `TreatXAs`, a one-letter word before `As`: write `UrlIsValid`, and give `TreatXAs` `//nolint:naming`.
+What naming cannot see, so a code reviewer checks it:
+
+- an import alias of two words joined, such as `serverhttp`: write `serverHttp`;
+- `IPv4`, which it reads as `I` and `Pv4`: write `Ipv4`;
+- `URLIsValid`, for which it suggests `UrlisValid`, since it reads the `s` as a plural: write `UrlIsValid`;
+- `TreatXAs`, a one-letter word before `As`, which it reports by mistake: give it `//nolint:naming`.
 
 ## Release
 
