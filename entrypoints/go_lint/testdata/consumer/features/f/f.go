@@ -9,7 +9,7 @@ func init() {
 }
 
 // Fetch asks the server for its page.
-func Fetch() error {
+func (UseCases) Fetch() error {
 	request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
 	if err != nil {
 		return err

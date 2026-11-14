@@ -18,11 +18,11 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Analyzer reports each import that breaks the layers or another module's surface, and each cmd/
+// analyzer reports each import that breaks the layers or another module's surface, and each cmd/
 // package that is more than a launcher. It reports each entities module that fewer than two modules
 // of features, orchestration and entities import, and each orchestration module that imports fewer
 // than two features. It holds a test file only to the module surfaces and the HTTP framework ban.
-var Analyzer = &analysis.Analyzer{
+var analyzer = &analysis.Analyzer{
 	Name: "layers",
 	Doc:  "holds a Go module to the layers of the KK Forge architecture standard",
 	Run:  run,
@@ -35,7 +35,7 @@ var allowed = map[string][]string{
 	"features":      {"entities", "shared"},
 	"entities":      {"entities", "shared"},
 	"shared":        {"shared"},
-	"infra":         {"infra", "entities", "shared"},
+	"infra":         {"infra", "shared"},
 }
 
 // serverFrameworks lists the modules of the HTTP server frameworks in use in Go. The HTTP controller is the
@@ -101,6 +101,15 @@ func checkFile(pass *analysis.Pass, module goModule, dir string, file *ast.File,
 		if !isTest && from.layer != "entrypoints" {
 			checkHTTPServer(pass, file)
 		}
+		// A test drives the clock and the environment itself. A test kit, the package <package>_testing, follows the
+		// layer of the package it serves, but it may set them up as a test does.
+		isTestKitFile := strings.HasSuffix(file.Name.Name, "_testing")
+		if !isTest && !isTestKitFile && from.layer != "infra" && !from.isFeatureInfra() {
+			checkEnvironment(pass, *from, file)
+		}
+		if !isTest && !isTestKitFile && from.layer == "features" && from.dir == from.module && !isGenerated(pass, file) {
+			checkSurface(pass, *from, file)
+		}
 	}
 }
 
@@ -114,31 +123,19 @@ var serverNames = []string{
 	"ListenAndServe", "ListenAndServeTLS", "Serve", "ServeTLS", "Handle", "HandleFunc",
 }
 
-// checkHTTPServer reports each use of a net/http name that serves HTTP. It reads a name's package from the type
-// information, which also covers a dot-import. A file the host build leaves out has none, so there the check reads
-// the file's own name for net/http instead.
+// checkHTTPServer reports each use of a net/http name that serves HTTP, a method such as ServeMux.Handle included. It
+// matches the object a name resolves to through the types, a dot-import included. A file the host build leaves out
+// has no type information, so this check skips it: run go_lint with that file's GOOS or tags to check it.
 func checkHTTPServer(pass *analysis.Pass, file *ast.File) {
-	local := ""
-	for _, spec := range file.Imports {
-		if importPath, _ := strconv.Unquote(spec.Path.Value); importPath == "net/http" {
-			local = packageName(pass, spec, importPath)
-		}
-	}
 	ast.Inspect(file, func(node ast.Node) bool {
-		var name *ast.Ident
-		switch node := node.(type) {
-		case *ast.Ident:
-			if object := pass.TypesInfo.Uses[node]; object != nil && object.Pkg() != nil && object.Pkg().Path() == "net/http" {
-				name = node
-			}
-		case *ast.SelectorExpr:
-			pkg, isIdent := node.X.(*ast.Ident)
-			if isIdent && local != "" && pkg.Name == local && pass.TypesInfo.Uses[node.Sel] == nil {
-				name = node.Sel
-			}
+		ident, isIdent := node.(*ast.Ident)
+		if !isIdent {
+			return true
 		}
-		if name != nil && slices.Contains(serverNames, name.Name) {
-			pass.Reportf(name.Pos(), "net/http's %s serves HTTP: %s", name.Name, serverHint)
+		object := pass.TypesInfo.Uses[ident]
+		if object != nil && object.Pkg() != nil && object.Pkg().Path() == "net/http" &&
+			slices.Contains(serverNames, object.Name()) {
+			pass.Reportf(ident.Pos(), "net/http's %s serves HTTP: %s", object.Name(), serverHint)
 		}
 		return true
 	})
@@ -148,8 +145,10 @@ func checkImports(pass *analysis.Pass, module goModule, from place, file *ast.Fi
 	// The composition root, the file compose.go of an entrypoints/<name> package, imports a feature's infra.
 	isCompose := from.layer == "entrypoints" && from.dir == from.module && from.dir != "entrypoints" &&
 		filepath.Base(pass.Fset.Position(file.Package).Filename) == "compose.go"
+	// A scan that fails leaves the list empty, so each entity import of a feature's infra is reported, never passed.
+	ports, _ := portsOf(module)
 	for _, spec := range file.Imports {
-		if problem := module.importProblem(from, spec, isTest, isCompose); problem != "" {
+		if problem := module.importProblem(from, spec, isTest, isCompose, ports[from.module]); problem != "" {
 			pass.Reportf(spec.Pos(), "%s", problem)
 		}
 	}
@@ -219,7 +218,7 @@ func (m goModule) inside(importPath string) (string, bool) {
 // importProblem returns why an import breaks the layers, or "" when it keeps them. A test file may import any layer,
 // such as a real infra adapter in an integration test. It is still held to the module surfaces, and outside
 // entrypoints it may not import an HTTP server framework.
-func (m goModule) importProblem(from place, spec *ast.ImportSpec, isTest, isCompose bool) string {
+func (m goModule) importProblem(from place, spec *ast.ImportSpec, isTest, isCompose bool, portEntities []string) string {
 	importPath, _ := strconv.Unquote(spec.Path.Value)
 	if from.layer != "entrypoints" && isServerFramework(importPath) {
 		return fmt.Sprintf("only entrypoints may import the HTTP server framework %s: %s", importPath, serverHint)
@@ -229,28 +228,63 @@ func (m goModule) importProblem(from place, spec *ast.ImportSpec, isTest, isComp
 		return ""
 	}
 	to := placeOf(dir)
-	if to == nil || to.module == from.module {
+	if to == nil {
 		return ""
+	}
+	if to.module == from.module {
+		if isTest {
+			return ""
+		}
+		return ownModuleProblem(from, *to)
 	}
 	allowedLayers := allowed[from.layer]
-	// A feature's infra holds that feature's adapters, so it also imports the root infra they build on.
 	if from.isFeatureInfra() {
-		allowedLayers = append(slices.Clone(allowedLayers), "infra")
+		allowedLayers = featureInfraLayers
 	}
 	if !isTest && !slices.Contains(allowedLayers, to.layer) {
+		if from.isFeatureInfra() {
+			return fmt.Sprintf("a feature's infra may not import %s (%s)", to.layer, importPath)
+		}
 		return fmt.Sprintf("%s may not import %s (%s)", from.layer, to.layer, importPath)
 	}
-	// A feature's infra is the feature's second surface, which the composition root and a test import as a whole.
-	if to.isFeatureInfra() && dir == to.module+"/infra" && (isCompose || isTest) {
-		return ""
+	if !isTest && from.isFeatureInfra() && to.layer == "entities" && !slices.Contains(portEntities, to.module) {
+		return fmt.Sprintf("a feature's infra imports only the entities its port %s/port imports (%s)", from.module, importPath)
 	}
 	// A test also imports a surface's test kit, the package <name>_testing right inside it, as in
 	// features/batch/infra/infra_testing for the surface features/batch/infra.
 	if isTest && (isTestKit(dir, to.module) || to.isFeatureInfra() && isTestKit(dir, to.module+"/infra")) {
 		return ""
 	}
+	if to.isFeatureInfra() {
+		if !isTest && !isCompose {
+			return fmt.Sprintf("only the composition root, the compose.go of an entrypoints/<name> package, imports a feature's infra (%s)", importPath)
+		}
+		if dir != to.module+"/infra" {
+			return fmt.Sprintf("import %s/%s/infra, not its inner package %s", m.path, to.module, importPath)
+		}
+		return ""
+	}
 	if slices.Contains(published, to.layer) && dir != to.module {
 		return fmt.Sprintf("import %s/%s, not its inner package %s", m.path, to.module, importPath)
+	}
+	return ""
+}
+
+// featureInfraLayers lists the layers a feature's infra imports beyond its own feature.
+var featureInfraLayers = []string{"entities", "infra", "shared"}
+
+// ownModuleProblem returns why a package may not import another package of its own module, or "". A feature's infra
+// imports of its feature only the port, and the feature's other code does not import its infra: the composition root
+// passes the adapter in.
+func ownModuleProblem(from, to place) string {
+	if from.isFeatureInfra() {
+		if to.isFeatureInfra() || to.isPort() {
+			return ""
+		}
+		return fmt.Sprintf("a feature's infra imports of its feature only the port %s/port (%s)", to.module, to.dir)
+	}
+	if to.isFeatureInfra() {
+		return fmt.Sprintf("a feature does not import its own infra (%s): the composition root passes the adapter in", to.dir)
 	}
 	return ""
 }
@@ -325,10 +359,24 @@ type place struct {
 	dir string
 }
 
-// isFeatureInfra returns whether a place sits in a feature's own infra: the package features/<x>/infra or one under
-// it, which holds the adapters only that feature needs.
+// inModule returns the path of a place inside its module, such as "infra/db" for features/a/infra/db, or "".
+func (p place) inModule() string {
+	inside, _ := strings.CutPrefix(p.dir, p.module+"/")
+	if inside == p.dir {
+		return ""
+	}
+	return inside
+}
+
+// isFeatureInfra returns whether a place sits in a feature's own infra: the package features/<x>/infra or one under it.
 func (p place) isFeatureInfra() bool {
-	return p.layer == "features" && (p.dir == p.module+"/infra" || strings.HasPrefix(p.dir, p.module+"/infra/"))
+	inside := p.inModule()
+	return p.layer == "features" && (inside == "infra" || strings.HasPrefix(inside, "infra/"))
+}
+
+// isPort returns whether a place is a feature's port: the package features/<x>/port.
+func (p place) isPort() bool {
+	return p.layer == "features" && p.inModule() == "port"
 }
 
 // placeOf returns where a folder from the Go module root sits, or nil outside the layers.
@@ -348,4 +396,12 @@ func placeOf(dir string) *place {
 // it, where <name> is the surface's own folder name.
 func isTestKit(dir, surface string) bool {
 	return dir == surface+"/"+path.Base(surface)+"_testing"
+}
+
+// isGenerated returns whether a generator wrote a file, such as a protocol buffer's, which is no code a feature's author
+// shapes. cgo's output of an author's file also carries the generated header, but its position maps back to that file,
+// so it counts as the author's.
+func isGenerated(pass *analysis.Pass, file *ast.File) bool {
+	written := pass.Fset.File(file.Package).Name()
+	return ast.IsGenerated(file) && written == pass.Fset.Position(file.Package).Filename
 }

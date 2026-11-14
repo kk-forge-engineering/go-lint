@@ -1,4 +1,4 @@
-module github.com/kk-forge-engineering/go-lint/v3
+module github.com/kk-forge-engineering/go-lint/v4
 
 go 1.26.0
 

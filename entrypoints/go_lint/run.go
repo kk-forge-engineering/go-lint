@@ -17,9 +17,9 @@ import (
 	"github.com/golangci/plugin-module-register/register"
 	"golang.org/x/tools/go/analysis"
 
-	module "github.com/kk-forge-engineering/go-lint/v3"
-	"github.com/kk-forge-engineering/go-lint/v3/features/config"
-	"github.com/kk-forge-engineering/go-lint/v3/features/layers"
+	module "github.com/kk-forge-engineering/go-lint/v4"
+	"github.com/kk-forge-engineering/go-lint/v4/features/config"
+	"github.com/kk-forge-engineering/go-lint/v4/features/layers"
 )
 
 const usage = `usage: go_lint run [packages]   lint, and check the formatting
@@ -80,11 +80,12 @@ func prepare(args []string) error {
 	if err != nil {
 		return err
 	}
-	importsKey, err := layers.ImportsKey(root)
+	layersUseCases := layers.New(layers.Options{})
+	importsKey, err := layersUseCases.ImportsKey(root)
 	if err != nil {
 		return err
 	}
-	data, err := config.For(os.DirFS(root), importsKey)
+	data, err := config.New(config.Options{}).For(os.DirFS(root), importsKey)
 	if err != nil {
 		return err
 	}
@@ -92,7 +93,9 @@ func prepare(args []string) error {
 	if err != nil {
 		return err
 	}
-	register.Plugin("layers", func(any) (register.LinterPlugin, error) { return layersPlugin{}, nil })
+	register.Plugin("layers", func(any) (register.LinterPlugin, error) {
+		return layersPlugin{layers: layersUseCases}, nil
+	})
 	os.Args = slices.Concat([]string{os.Args[0], args[0], "--config", file}, args[1:])
 	return nil
 }
@@ -165,10 +168,13 @@ func moduleRoot() (string, error) {
 	}
 }
 
-type layersPlugin struct{}
+// layersPlugin hands golangci-lint the layers analyzer.
+type layersPlugin struct {
+	layers *layers.UseCases
+}
 
-func (layersPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
-	return []*analysis.Analyzer{layers.Analyzer}, nil
+func (plugin layersPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
+	return []*analysis.Analyzer{plugin.layers.Analyzer()}, nil
 }
 
 // GetLoadMode asks for type information, which gives the analyzer the names of imported packages.

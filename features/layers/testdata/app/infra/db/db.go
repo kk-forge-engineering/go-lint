@@ -1,7 +1,10 @@
 package db
 
 import (
-	_ "example.com/app/entities/lone"
-	_ "example.com/app/entities/user"
+	"time"
+
 	_ "example.com/app/shared"
 )
+
+// Now reads the clock, which infra may do.
+func Now() time.Time { return time.Now() }

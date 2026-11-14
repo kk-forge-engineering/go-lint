@@ -7,7 +7,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/kk-forge-engineering/go-lint/v3/features/config"
+	"github.com/kk-forge-engineering/go-lint/v4/features/config"
 )
 
 // goMod is the go.mod of the modules the tests build their configuration for.
@@ -20,7 +20,7 @@ func TestForAddsEachExclusionWithoutItsReason(t *testing.T) {
     reason: the tools are throwaway scripts
 `)}}
 
-	data, err := config.For(module, "key")
+	data, err := config.New(config.Options{}).For(module, "key")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestForFails(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			module := fstest.MapFS{"go.mod": goMod, test.file: {Data: []byte(test.content)}}
-			_, err := config.For(module, "key")
+			_, err := config.New(config.Options{}).For(module, "key")
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Errorf("For() error = %v, want one containing %q", err, test.want)
 			}
@@ -86,7 +86,7 @@ func TestForFails(t *testing.T) {
 }
 
 func TestForPassesTheImportsKeyToTheLayersLinter(t *testing.T) {
-	data, err := config.For(fstest.MapFS{"go.mod": goMod}, "key")
+	data, err := config.New(config.Options{}).For(fstest.MapFS{"go.mod": goMod}, "key")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestForPassesTheImportsKeyToTheLayersLinter(t *testing.T) {
 }
 
 func TestForWithoutGoLintYmlKeepsTheBuiltInSet(t *testing.T) {
-	data, err := config.For(fstest.MapFS{"go.mod": goMod}, "key")
+	data, err := config.New(config.Options{}).For(fstest.MapFS{"go.mod": goMod}, "key")
 	if err != nil {
 		t.Fatal(err)
 	}

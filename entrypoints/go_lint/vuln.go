@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 
 	"golang.org/x/vuln/scan"
+
+	"github.com/kk-forge-engineering/go-lint/v4/infra/env"
 )
 
 // vuln runs govulncheck over the packages, ./... when none is named, and returns its exit code, which is 3 when the
@@ -27,9 +28,7 @@ func vuln(patterns []string) int {
 	command := scan.Command(context.Background(), patterns...)
 	// govulncheck takes the standard library's version from GOVERSION when the environment sets it, so a version past
 	// every fix would hide each finding there. Without it, govulncheck asks the toolchain.
-	command.Env = slices.DeleteFunc(os.Environ(), func(variable string) bool {
-		return strings.HasPrefix(variable, "GOVERSION=")
-	})
+	command.Env = env.Without("GOVERSION")
 	err := command.Start()
 	if err == nil {
 		err = command.Wait()
