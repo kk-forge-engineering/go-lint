@@ -94,7 +94,7 @@ The direction guard of the KK Forge architecture standard. Each layer imports on
 
 It reports:
 
-- an import that breaks the table;
+- an import that breaks the table. A feature's own infra, `features/<x>/infra` and the packages under it, holds the adapters only that feature needs and also imports the root `infra`. It is the feature's second surface: the composition root, the `compose.go` of an `entrypoints/<name>` package, and a test import the package `features/<x>/infra` itself;
 - an import of a package inside another `orchestration`, `features` or `entities` module. A module is the folder directly under its layer, and its package there is its surface;
 - an import in `cmd/` of anything but a package under `entrypoints/`;
 - a package in `cmd/<name>/` that holds more than `func main` with one call, without arguments, into `entrypoints/<name>`;

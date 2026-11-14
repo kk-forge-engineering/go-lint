@@ -145,8 +145,11 @@ func checkHTTPServer(pass *analysis.Pass, file *ast.File) {
 }
 
 func checkImports(pass *analysis.Pass, module goModule, from place, file *ast.File, isTest bool) {
+	// The composition root, the file compose.go of an entrypoints/<name> package, imports a feature's infra.
+	isCompose := from.layer == "entrypoints" && from.dir == from.module && from.dir != "entrypoints" &&
+		filepath.Base(pass.Fset.Position(file.Package).Filename) == "compose.go"
 	for _, spec := range file.Imports {
-		if problem := module.importProblem(from, spec, isTest); problem != "" {
+		if problem := module.importProblem(from, spec, isTest, isCompose); problem != "" {
 			pass.Reportf(spec.Pos(), "%s", problem)
 		}
 	}
@@ -216,7 +219,7 @@ func (m goModule) inside(importPath string) (string, bool) {
 // importProblem returns why an import breaks the layers, or "" when it keeps them. A test file may import any layer,
 // such as a real infra adapter in an integration test. It is still held to the module surfaces, and outside
 // entrypoints it may not import an HTTP server framework.
-func (m goModule) importProblem(from place, spec *ast.ImportSpec, isTest bool) string {
+func (m goModule) importProblem(from place, spec *ast.ImportSpec, isTest, isCompose bool) string {
 	importPath, _ := strconv.Unquote(spec.Path.Value)
 	if from.layer != "entrypoints" && isServerFramework(importPath) {
 		return fmt.Sprintf("only entrypoints may import the HTTP server framework %s: %s", importPath, serverHint)
@@ -229,8 +232,17 @@ func (m goModule) importProblem(from place, spec *ast.ImportSpec, isTest bool) s
 	if to == nil || to.module == from.module {
 		return ""
 	}
-	if !isTest && !slices.Contains(allowed[from.layer], to.layer) {
+	allowedLayers := allowed[from.layer]
+	// A feature's infra holds that feature's adapters, so it also imports the root infra they build on.
+	if from.isFeatureInfra() {
+		allowedLayers = append(slices.Clone(allowedLayers), "infra")
+	}
+	if !isTest && !slices.Contains(allowedLayers, to.layer) {
 		return fmt.Sprintf("%s may not import %s (%s)", from.layer, to.layer, importPath)
+	}
+	// A feature's infra is the feature's second surface, which the composition root and a test import as a whole.
+	if to.isFeatureInfra() && dir == to.module+"/infra" && (isCompose || isTest) {
+		return ""
 	}
 	if slices.Contains(published, to.layer) && dir != to.module {
 		return fmt.Sprintf("import %s/%s, not its inner package %s", m.path, to.module, importPath)
@@ -304,6 +316,14 @@ type place struct {
 	layer string
 	// module is the folder directly under the layer, or the layer's own folder for a package there.
 	module string
+	// dir is the folder itself.
+	dir string
+}
+
+// isFeatureInfra returns whether a place sits in a feature's own infra: the package features/<x>/infra or one under
+// it, which holds the adapters only that feature needs.
+func (p place) isFeatureInfra() bool {
+	return p.layer == "features" && (p.dir == p.module+"/infra" || strings.HasPrefix(p.dir, p.module+"/infra/"))
 }
 
 // placeOf returns where a folder from the Go module root sits, or nil outside the layers.
@@ -314,7 +334,7 @@ func placeOf(dir string) *place {
 		return nil
 	}
 	if len(parts) == 1 {
-		return &place{layer: layer, module: layer}
+		return &place{layer: layer, module: layer, dir: dir}
 	}
-	return &place{layer: layer, module: layer + "/" + parts[1]}
+	return &place{layer: layer, module: layer + "/" + parts[1], dir: dir}
 }
