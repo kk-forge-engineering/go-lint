@@ -12,6 +12,7 @@ linters:
   default: none
   enable:
     - layers
+    - naming
     - errcheck
     - govet
     - staticcheck
@@ -40,6 +41,9 @@ linters:
       layers:
         type: module
         description: holds a Go module to the layers of the KK Forge architecture standard
+      naming:
+        type: module
+        description: holds an initialism in an identifier to one word, as the KK Forge code style does
     govet:
       enable-all: true
       disable:

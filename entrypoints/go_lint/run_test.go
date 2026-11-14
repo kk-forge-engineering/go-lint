@@ -92,7 +92,7 @@ func goLintIn(t *testing.T, dir, home string, args ...string) (string, int) {
 
 var issue = regexp.MustCompile(`(?m)^(\S+:\d+):\d+: .* \((\w+)\)$`)
 
-func TestRunReportsTheLayersAnalyzerAndAppliesTheProjectExclusions(t *testing.T) {
+func TestRunReportsTheAnalyzersAndAppliesTheProjectExclusions(t *testing.T) {
 	output, code := goLint(t, "run", "./...")
 
 	var got []string
@@ -105,7 +105,7 @@ func TestRunReportsTheLayersAnalyzerAndAppliesTheProjectExclusions(t *testing.T)
 	want := []string{
 		"features/a/a.go:3 layers", "features/c/c.go:7 nolintlint", "features/d/d.go:7 nolintlint",
 		"features/f/f.go:13 noctx", "features/f/f.go:7 gochecknoinits", "features/f/tls.go:12 gosec",
-		"features/f/tls.go:7 gosec",
+		"features/f/tls.go:7 gosec", "features/g/g.go:7 naming",
 	}
 	if code != 1 || !slices.Equal(got, want) {
 		t.Errorf("go_lint run exited %d with issues %v, want 1 with %v\n%s", code, got, want, output)

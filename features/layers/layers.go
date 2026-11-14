@@ -99,7 +99,7 @@ func checkFile(pass *analysis.Pass, module goModule, dir string, file *ast.File,
 		checkImports(pass, module, *from, file, isTest)
 		// A test may start an httptest server to fake an outside API.
 		if !isTest && from.layer != "entrypoints" {
-			checkHTTPServer(pass, file)
+			checkHttpServer(pass, file)
 		}
 	}
 }
@@ -114,10 +114,10 @@ var serverNames = []string{
 	"ListenAndServe", "ListenAndServeTLS", "Serve", "ServeTLS", "Handle", "HandleFunc",
 }
 
-// checkHTTPServer reports each use of a net/http name that serves HTTP. It reads a name's package from the type
+// checkHttpServer reports each use of a net/http name that serves HTTP. It reads a name's package from the type
 // information, which also covers a dot-import. A file the host build leaves out has none, so there the check reads
 // the file's own name for net/http instead.
-func checkHTTPServer(pass *analysis.Pass, file *ast.File) {
+func checkHttpServer(pass *analysis.Pass, file *ast.File) {
 	local := ""
 	for _, spec := range file.Imports {
 		if importPath, _ := strconv.Unquote(spec.Path.Value); importPath == "net/http" {

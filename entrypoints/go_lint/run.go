@@ -20,6 +20,7 @@ import (
 	module "github.com/kk-forge-engineering/go-lint/v3"
 	"github.com/kk-forge-engineering/go-lint/v3/features/config"
 	"github.com/kk-forge-engineering/go-lint/v3/features/layers"
+	"github.com/kk-forge-engineering/go-lint/v3/features/naming"
 )
 
 const usage = `usage: go_lint run [packages]   lint, and check the formatting
@@ -92,7 +93,8 @@ func prepare(args []string) error {
 	if err != nil {
 		return err
 	}
-	register.Plugin("layers", func(any) (register.LinterPlugin, error) { return layersPlugin{}, nil })
+	register.Plugin("layers", func(any) (register.LinterPlugin, error) { return typesPlugin{layers.Analyzer}, nil })
+	register.Plugin("naming", func(any) (register.LinterPlugin, error) { return typesPlugin{naming.Analyzer}, nil })
 	os.Args = slices.Concat([]string{os.Args[0], args[0], "--config", file}, args[1:])
 	return nil
 }
@@ -165,13 +167,15 @@ func moduleRoot() (string, error) {
 	}
 }
 
-type layersPlugin struct{}
+// typesPlugin hands golangci-lint one of go-lint's analyzers.
+type typesPlugin struct{ analyzer *analysis.Analyzer }
 
-func (layersPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
-	return []*analysis.Analyzer{layers.Analyzer}, nil
+func (p typesPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
+	return []*analysis.Analyzer{p.analyzer}, nil
 }
 
-// GetLoadMode asks for type information, which gives the analyzer the names of imported packages.
-func (layersPlugin) GetLoadMode() string {
+// GetLoadMode asks for type information. layers reads the names of imported packages from it, and naming reads the
+// interfaces those packages declare.
+func (typesPlugin) GetLoadMode() string {
 	return register.LoadModeTypesInfo
 }
