@@ -11,7 +11,7 @@ const Plain Kind = 0
 
 func Save() {} // want `Save is a free function on the surface of features/texts: make it a method of UseCases in texts_use_cases\.go, or unexport it as a helper`
 
-var Default = Text{} // want `Default is a variable on the surface of features/texts, which gives out only UseCases and types`
+var Default = Text{} // want `Default is a variable on the surface of features/texts, which gives out only UseCases, types and sentinel errors`
 
 // trim is a helper the surface leaves out.
 func trim(text Text) Text { return text }
