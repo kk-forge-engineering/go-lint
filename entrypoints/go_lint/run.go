@@ -177,7 +177,8 @@ func (plugin layersPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
 	return []*analysis.Analyzer{plugin.layers.Analyzer()}, nil
 }
 
-// GetLoadMode asks for type information, which gives the analyzer the names of imported packages.
+// GetLoadMode asks golangci-lint for type information. The analyzer resolves imports, names and
+// calls through the type information.
 func (layersPlugin) GetLoadMode() string {
 	return register.LoadModeTypesInfo
 }
