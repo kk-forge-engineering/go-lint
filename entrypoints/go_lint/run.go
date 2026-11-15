@@ -17,9 +17,9 @@ import (
 	"github.com/golangci/plugin-module-register/register"
 	"golang.org/x/tools/go/analysis"
 
-	module "github.com/kk-forge-engineering/go-lint/v4"
-	"github.com/kk-forge-engineering/go-lint/v4/features/config"
-	"github.com/kk-forge-engineering/go-lint/v4/features/layers"
+	module "github.com/kk-forge-engineering/go-lint/v5"
+	"github.com/kk-forge-engineering/go-lint/v5/features/config"
+	"github.com/kk-forge-engineering/go-lint/v5/features/layers"
 )
 
 const usage = `usage: go_lint run [packages]   lint, and check the formatting

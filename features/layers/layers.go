@@ -18,10 +18,10 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// analyzer reports each import that breaks the layers or another module's surface, and each cmd/
-// package that is more than a launcher. It reports each entities module that fewer than two modules
-// of features, orchestration and entities import, and each orchestration module that imports fewer
-// than two features. It holds a test file only to the module surfaces and the HTTP framework ban.
+// analyzer reports each import that breaks the layers or another module's surface, and each cmd/ package that is more
+// than a launcher. It reports each entities module that fewer than two modules of features, orchestration and entities
+// import, and each orchestration module that imports fewer than two features. It holds a test file only to the module
+// surfaces, the HTTP framework ban and the ban on another app's module.
 var analyzer = &analysis.Analyzer{
 	Name: "layers",
 	Doc:  "holds a Go module to the layers of the KK Forge architecture standard",
@@ -82,7 +82,10 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, checkModule(pass, module, packageDir)
 }
 
+// checkFile reports each problem of a file in dir by the rules of the layer dir sits in, and skips a folder outside the
+// layers.
 func checkFile(pass *analysis.Pass, module goModule, dir string, file *ast.File, isTest bool) {
+	checkAppImports(pass, module, file)
 	launcher, isLauncher := strings.CutPrefix(dir, "cmd/")
 	switch {
 	case isTest && (dir == "cmd" || isLauncher):
@@ -104,8 +107,12 @@ func checkFile(pass *analysis.Pass, module goModule, dir string, file *ast.File,
 		// A test drives the clock and the environment itself. A test kit, the package <package>_testing, follows the
 		// layer of the package it serves, but it may set them up as a test does.
 		isTestKitFile := strings.HasSuffix(file.Name.Name, "_testing")
-		if !isTest && !isTestKitFile && from.layer != "infra" && !from.isFeatureInfra() {
+		isInfra := from.layer == "infra" || from.isFeatureInfra()
+		if !isTest && !isTestKitFile && !isInfra {
 			checkEnvironment(pass, *from, file)
+		}
+		if !isTest && !isTestKitFile && isInfra && isPackageModule(module.root) {
+			checkPackageEnvironment(pass, file)
 		}
 		if !isTest && !isTestKitFile && from.layer == "features" && from.dir == from.module && !isGenerated(pass, file) {
 			checkSurface(pass, *from, file)
