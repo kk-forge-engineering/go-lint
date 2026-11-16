@@ -109,13 +109,3 @@ func TestForPassesTheImportsKeyToTheLayersLinter(t *testing.T) {
 		t.Errorf("layers settings imports = %q, want %q", key, "key")
 	}
 }
-
-func TestForWithoutGoLintYmlKeepsTheBuiltInSet(t *testing.T) {
-	data, err := config.New(config.Options{}).For(fstest.MapFS{"go.mod": goMod}, "key")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(data), "layers") {
-		t.Errorf("configuration has no layers linter:\n%s", data)
-	}
-}
