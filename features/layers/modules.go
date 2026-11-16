@@ -246,8 +246,9 @@ func reportOrchestration(pass *analysis.Pass, file *ast.File, orchestration stri
 	}
 }
 
-// ImportsKey returns a key of the imports the module-wide checks of the Go module at root count. It changes whenever a
-// module starts or stops importing a feature or an entity, so a cache of results can key on it.
+// ImportsKey returns a key of the imports the module-wide checks of the Go module at root count, and of the Go modules
+// of its monorepo. It changes whenever a module starts or stops importing a feature or an entity, or a module of the
+// monorepo changes its path, so a cache of results can key on it.
 func (*UseCases) ImportsKey(root string) (string, error) {
 	module, err := moduleOf(root)
 	if err != nil {
@@ -269,6 +270,7 @@ func (*UseCases) ImportsKey(root string) (string, error) {
 	for _, feature := range slices.Sorted(maps.Keys(ports)) {
 		text.WriteString("port " + feature + ":" + strings.Join(ports[feature], ",") + "\n")
 	}
+	text.WriteString(repositoryKey(module.root))
 	sum := sha256.Sum256([]byte(text.String()))
 	return hex.EncodeToString(sum[:]), nil
 }

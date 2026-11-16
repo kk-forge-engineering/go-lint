@@ -1,0 +1,9 @@
+// The checks between apps and packages need the go.work at the repository root. analysistest takes
+// a go.work only from the folder it loads, so each go.mod still names its neighbours with replace.
+go 1.26.0
+
+use (
+	./apps/api
+	./apps/web
+	./packages/logger
+)
