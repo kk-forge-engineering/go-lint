@@ -69,7 +69,7 @@ func (*UseCases) For(module fs.FS, importsKey string) ([]byte, error) {
 }
 
 // modulePath returns the module path in go.mod. It refuses a path without a dot in its first element, such as
-// idea_packer: gofumpt takes an import of such a path for the standard library unless it starts like the module's
+// artel: gofumpt takes an import of such a path for the standard library unless it starts like the module's
 // own, and gci groups it apart, so where one such module imports another, go_lint run refuses what go_lint fmt
 // writes.
 func modulePath(module fs.FS) (string, error) {

@@ -27,7 +27,7 @@ run = "go_lint fmt"
 
 `go_lint run` and `go_lint fmt` refuse to run beside a `.golangci.yml`, `.yaml`, `.toml` or `.json` at the Go module root.
 
-They also refuse a module whose path has no dot in its first element, such as `idea_packer`. gofumpt takes an import of such a path for the standard library unless it starts like the module's own path, and gci groups it apart, so where one such module imports another, `go_lint run` refuses what `go_lint fmt` writes. Name the module after its repository, such as `github.com/kk-forge-engineering/<repo>`.
+They also refuse a module whose path has no dot in its first element, such as `artel`. gofumpt takes an import of such a path for the standard library unless it starts like the module's own path, and gci groups it apart, so where one such module imports another, `go_lint run` refuses what `go_lint fmt` writes. Name the module after its repository, such as `github.com/kk-forge-engineering/<repo>`.
 
 ## Exclusions
 
