@@ -11,7 +11,7 @@ import (
 )
 
 // goMod is the go.mod of the modules the tests build their configuration for.
-var goMod = &fstest.MapFile{Data: []byte("module github.com/kk-forge-engineering/idea-packer/backend\n\ngo 1.26.0\n")}
+var goMod = &fstest.MapFile{Data: []byte("module github.com/kk-forge-engineering/artel/backend\n\ngo 1.26.0\n")}
 
 func TestForAddsEachExclusionWithoutItsReason(t *testing.T) {
 	module := fstest.MapFS{"go.mod": goMod, "go_lint.yml": {Data: []byte(`exclusions:
@@ -66,13 +66,13 @@ func TestForFails(t *testing.T) {
 		},
 		{"on a go.mod without a module path", "go.mod", "go 1.26.0\n", "go.mod declares no module path"},
 		{
-			"on a module path without a dot in its first element", "go.mod", "module idea_packer/backend\n",
-			"module path idea_packer/backend has no dot in its first element: name the module after its repository, " +
+			"on a module path without a dot in its first element", "go.mod", "module artel/backend\n",
+			"module path artel/backend has no dot in its first element: name the module after its repository, " +
 				"such as github.com/kk-forge-engineering/<repo>",
 		},
 		{
-			"on a one-element module path", "go.mod", "module idea_packer\n",
-			"module path idea_packer has no dot in its first element",
+			"on a one-element module path", "go.mod", "module artel\n",
+			"module path artel has no dot in its first element",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
