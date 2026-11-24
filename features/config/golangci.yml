@@ -12,6 +12,7 @@ linters:
   default: none
   enable:
     - layers
+    - doccomments
     - errcheck
     - govet
     - staticcheck
@@ -40,6 +41,9 @@ linters:
       layers:
         type: module
         description: holds a Go module to the layers of the KK Forge architecture standard
+      doccomments:
+        type: module
+        description: holds doc comments to the // form of the KK Forge comments standard
     govet:
       enable-all: true
       disable:
