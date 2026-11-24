@@ -17,14 +17,17 @@ import (
 	"github.com/golangci/plugin-module-register/register"
 	"golang.org/x/tools/go/analysis"
 
-	module "github.com/kk-forge-engineering/go-lint/v5"
-	"github.com/kk-forge-engineering/go-lint/v5/features/config"
-	"github.com/kk-forge-engineering/go-lint/v5/features/layers"
+	module "github.com/kk-forge-engineering/go-lint/v6"
+	"github.com/kk-forge-engineering/go-lint/v6/features/config"
+	"github.com/kk-forge-engineering/go-lint/v6/features/doccomments"
+	"github.com/kk-forge-engineering/go-lint/v6/features/layers"
 )
 
 const usage = `usage: go_lint run [packages]   lint, and check the formatting
        go_lint fmt [paths]      format
-       go_lint vuln [packages]  report the known vulnerabilities the code calls`
+       go_lint vuln [packages]  report the known vulnerabilities the code calls
+       go_lint cover [--min <percent>] [packages]
+                                run the tests, write the coverage and test reports, and fail under the floor`
 
 // forbidden lists the golangci-lint flags that would change the built-in configuration, so a run on a laptop and a
 // run in CI check the same rules.
@@ -36,10 +39,16 @@ var forbidden = []string{
 	"-n", "--new", "--new-from-rev", "--new-from-patch", "--new-from-merge-base", "--whole-files",
 }
 
-// Run runs go-lint with the process's arguments, and exits with the exit code of golangci-lint or govulncheck.
+// Run runs go-lint with the process's arguments, and exits with the exit code of golangci-lint, govulncheck or the
+// coverage run.
 func Run() {
-	if len(os.Args) > 1 && os.Args[1] == "vuln" {
-		os.Exit(vuln(os.Args[2:]))
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "vuln":
+			os.Exit(vuln(os.Args[2:]))
+		case "cover":
+			os.Exit(cover(os.Args[2:]))
+		}
 	}
 	if err := prepare(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "go_lint:", err)
@@ -64,7 +73,8 @@ func cacheVersion() string {
 	return "(devel)"
 }
 
-// prepare checks the arguments, writes the configuration and sets the arguments golangci-lint reads.
+// prepare checks the arguments, writes the configuration, registers the layers and doccomments plugins, and sets
+// `os.Args` to the command line golangci-lint reads.
 func prepare(args []string) error {
 	if len(args) == 0 || (args[0] != "run" && args[0] != "fmt") {
 		return fmt.Errorf("unknown command\n%s", usage)
@@ -95,6 +105,9 @@ func prepare(args []string) error {
 	}
 	register.Plugin("layers", func(any) (register.LinterPlugin, error) {
 		return layersPlugin{layers: layersUseCases}, nil
+	})
+	register.Plugin("doccomments", func(any) (register.LinterPlugin, error) {
+		return docCommentsPlugin{docComments: doccomments.New(doccomments.Options{})}, nil
 	})
 	os.Args = slices.Concat([]string{os.Args[0], args[0], "--config", file}, args[1:])
 	return nil
@@ -181,4 +194,18 @@ func (plugin layersPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
 // calls through the type information.
 func (layersPlugin) GetLoadMode() string {
 	return register.LoadModeTypesInfo
+}
+
+// docCommentsPlugin hands golangci-lint the doccomments analyzer.
+type docCommentsPlugin struct {
+	docComments *doccomments.UseCases
+}
+
+func (plugin docCommentsPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
+	return []*analysis.Analyzer{plugin.docComments.Analyzer()}, nil
+}
+
+// GetLoadMode asks golangci-lint for the syntax alone. The analyzer reads only the comments.
+func (docCommentsPlugin) GetLoadMode() string {
+	return register.LoadModeSyntax
 }

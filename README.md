@@ -1,6 +1,6 @@
 # go-lint
 
-KK Forge's build of golangci-lint for Go modules, the Go counterpart of `@kk-forge/oxlint-config`. One versioned binary carries the linters, their configuration, the `layers` analyzer and govulncheck, so a repo keeps no `.golangci.yml`, and a laptop and CI check the same rules.
+KK Forge's build of golangci-lint for Go modules, the Go counterpart of `@kk-forge/oxlint-config`. One versioned binary carries the linters, their configuration, the `layers` and `doccomments` analyzers, govulncheck and the coverage floor, so a repo keeps no `.golangci.yml`, and a laptop and CI check the same rules.
 
 ## Use
 
@@ -9,13 +9,16 @@ Add go-lint to the repo's `mise.toml`. Its command is `go_lint`: a name of sever
 ```toml
 [tools]
 go = "1"
-"go:github.com/kk-forge-engineering/go-lint/v5/cmd/go_lint" = "5"
+"go:github.com/kk-forge-engineering/go-lint/v6/cmd/go_lint" = "6"
 
 [tasks.lint]
 run = ["go_lint run ./...", "go_lint vuln ./..."]
 
 [tasks."lint:fix"]
 run = "go_lint fmt"
+
+[tasks."test:ci"]
+run = "go_lint cover ./..."
 ```
 
 - `go_lint run [packages]` runs the linters and checks the formatting. It takes golangci-lint's `run` flags. It refuses, in any form, the flags that change the rules or whether the run fails:
@@ -24,6 +27,7 @@ run = "go_lint fmt"
   - the filters to new issues: `-n`, `--new`, `--new-from-rev`, `--new-from-patch`, `--new-from-merge-base`, `--whole-files`
 - `go_lint fmt [paths]` formats the code.
 - `go_lint vuln [packages]` runs govulncheck: it reports each known vulnerability the code calls, and exits 3 when it finds one. It reads the Go vulnerability database online on each run, so it needs the network. A vulnerable module the code never calls does not fail the run, and neither does a call from a test file. It also checks the standard library of the Go that runs it: a call into a vulnerability that a later Go fixes fails the run until `mise upgrade go` installs that Go. It takes no flag, because a flag could choose another database or let a finding pass.
+- `go_lint cover [--min <percent>] [packages]` runs the tests of the packages, `./...` when none is named, and fails when a test fails or the total coverage is under the floor. The total counts the statements of every package the patterns match except a test kit, the package `<name>_testing`, which runs only under the tests. The floor is the KK Forge testing standard's 80%. `--min` raises it and refuses a value under 80. It writes `coverage/coverage.out` for SonarQube's `sonar.go.coverage.reportPaths` and `coverage/test-report.json`, the `go test -json` stream, for `sonar.go.tests.reportPaths`. It prints the output of a failed test and of each package, as `go test` prints it without `-v`. It exits 1 when a test fails or the total is under the floor, and 2 on a refused flag or when it measured nothing.
 
 `go_lint run` and `go_lint fmt` refuse to run beside a `.golangci.yml`, `.yaml`, `.toml` or `.json` at the Go module root.
 
@@ -44,11 +48,12 @@ A `//nolint` comment names its linters and gives a reason, as in `//nolint:errch
 
 ## The set
 
-A linter is in the set when it catches a bug or a security hole and rarely reports anything else, as in `@kk-forge/oxlint-config`. Style is left to the formatters.
+A linter is in the set when it catches a bug or a security hole and rarely reports anything else, as in `@kk-forge/oxlint-config`. `layers` and `doccomments` hold a KK Forge standard instead, which no linter of golangci-lint checks. Other style is left to the formatters.
 
 | Linter | Catches |
 |---|---|
 | `layers` | an import against the layer table or another module's surface, and a `cmd/` package that is more than a launcher (below) |
+| `doccomments` | a `/* */` block in the doc comment of a package, a declaration or a field. The KK Forge comments standard writes a Go doc comment as `//` lines, as godoc does. The block above `import "C"` is cgo's C code and passes |
 | `errcheck` | an error dropped without a word. Write `_ =` where dropping it is meant |
 | `govet` | what every vet analyzer catches. Two stay off: `fieldalignment` reorders fields to save memory, and `shadow` reports the idiomatic shadowed `err` |
 | `staticcheck` | its `SA` bug checks. The `S1` simplifications, `ST` style checks and `QF` quick fixes stay off |
