@@ -89,7 +89,9 @@ func goLintIn(t *testing.T, dir, home string, args ...string) (string, int) {
 	command := exec.Command(binary, args...)
 	command.Dir = dir
 	// The go tool's caches stay where they are, so the run compiles nothing again.
-	command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, ".cache"),
+	// golangci-lint refuses to start while another run holds its lock file in the temp folder. A temp folder under
+	// home keeps the run apart from the go-lint that `mise run check` starts beside the tests.
+	command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, ".cache"), "TMPDIR="+home,
 		"GOCACHE="+goEnv["GOCACHE"], "GOMODCACHE="+goEnv["GOMODCACHE"], "GOLANGCI_LINT_CACHE="+filepath.Join(home, "golangci-lint"))
 	output, err := command.CombinedOutput()
 	var exitErr *exec.ExitError
