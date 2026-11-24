@@ -8,7 +8,6 @@ import (
 )
 
 func TestSum(t *testing.T) {
-	t.Log("the output of a test that passes")
 	if got := calc.Sum(calc_testing.Numbers()...); got != 6 {
 		t.Errorf("Sum = %d, want 6", got)
 	}

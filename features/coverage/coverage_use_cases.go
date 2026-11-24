@@ -1,7 +1,6 @@
 package coverage
 
-// UseCases picks the packages a coverage run measures, reads the total from a coverage profile and prints the
-// `go test -json` stream of the run.
+// UseCases picks the packages a coverage run measures and reads the total from a coverage profile.
 type UseCases struct{}
 
 // Options holds the settings and dependencies of the use cases. The use cases need none yet.
