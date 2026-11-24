@@ -228,7 +228,7 @@ func TestRunReportsAFeatureInfraImportThePortDroppedSinceTheCachedRun(t *testing
 	}
 }
 
-// covered copies testdata/covered, where `go_lint cover` writes its reports, into a folder of the test's own.
+// covered copies testdata/covered, where `go_lint cover` writes its profile, into a folder of the test's own.
 func covered(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -238,9 +238,9 @@ func covered(t *testing.T) string {
 	return dir
 }
 
-// TestCoverLeavesOutTheTestKitsAndWritesTheReports expects a total of 88.9%. The fixture's kit calc_testing holds
+// TestCoverLeavesOutTheTestKitsAndWritesTheProfile expects a total of 88.9%. The fixture's kit calc_testing holds
 // most of its statements, and no test runs them: counted, they would bring the total down to 56.2%.
-func TestCoverLeavesOutTheTestKitsAndWritesTheReports(t *testing.T) {
+func TestCoverLeavesOutTheTestKitsAndWritesTheProfile(t *testing.T) {
 	dir := covered(t)
 
 	output, code := goLintIn(t, dir, t.TempDir(), "cover")
@@ -248,15 +248,8 @@ func TestCoverLeavesOutTheTestKitsAndWritesTheReports(t *testing.T) {
 	if code != 0 || !strings.Contains(output, "coverage 88.9% of statements, floor 80%") {
 		t.Errorf("go_lint cover exited %d, want 0 with a total of 88.9%%\n%s", code, output)
 	}
-	if strings.Contains(output, "the output of a test that passes") {
-		t.Errorf("go_lint cover printed the output of a test that passed\n%s", output)
-	}
 	if _, err := os.Stat(filepath.Join(dir, "coverage", "coverage.out")); err != nil {
 		t.Error(err)
-	}
-	report, err := os.ReadFile(filepath.Join(dir, "coverage", "test-report.json"))
-	if err != nil || !strings.Contains(string(report), `"Action":"pass","Package":"example.com/covered/calc","Test":"TestSum"`) {
-		t.Errorf("coverage/test-report.json = %s, %v; want TestSum's pass", report, err)
 	}
 }
 
@@ -279,22 +272,6 @@ func TestCoverFailsAndPrintsAFailedTest(t *testing.T) {
 
 	if code != 1 || !strings.Contains(output, "the output of a test that fails") || strings.Contains(output, "floor") {
 		t.Errorf("go_lint cover with a failing test exited %d, want 1 with the test's output and no total\n%s", code, output)
-	}
-}
-
-// TestCoverPrintsTheOutputOfATestThatExits checks that cover reports a failed test that has no fail event. go test's
-// JSON stream gives a test that calls os.Exit no fail event of its own, as it does for a test that times out.
-func TestCoverPrintsTheOutputOfATestThatExits(t *testing.T) {
-	dir := covered(t)
-	exits := "package calc_test\n\nimport (\n\t\"os\"\n\t\"testing\"\n)\n\nfunc TestExits(t *testing.T) {\n\tt.Log(\"the output of a test that exits\")\n\tos.Exit(1)\n}\n"
-	if err := os.WriteFile(filepath.Join(dir, "calc", "exits_test.go"), []byte(exits), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	output, code := goLintIn(t, dir, t.TempDir(), "cover")
-
-	if code != 1 || !strings.Contains(output, "the output of a test that exits") {
-		t.Errorf("go_lint cover with a test that exits exited %d, want 1 with the test's output\n%s", code, output)
 	}
 }
 

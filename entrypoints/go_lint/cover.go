@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,12 +14,9 @@ import (
 	"github.com/kk-forge-engineering/go-lint/v6/features/coverage"
 )
 
-// The files `go_lint cover` writes, in the folder the KK Forge testing standard keeps a package's reports in.
-// SonarQube reads the profile as `sonar.go.coverage.reportPaths` and the test report as `sonar.go.tests.reportPaths`.
-const (
-	coverageProfile = "coverage/coverage.out"
-	testReport      = "coverage/test-report.json"
-)
+// coverageProfile is the file `go_lint cover` writes, in the folder the KK Forge testing standard keeps a package's
+// reports in. SonarQube reads it as `sonar.go.coverage.reportPaths`.
+const coverageProfile = "coverage/coverage.out"
 
 // floor is the least total the KK Forge testing standard allows. A project may raise it.
 const floor = 80
@@ -49,20 +45,11 @@ func cover(args []string) int {
 		patterns = []string{"./..."}
 	}
 	useCases := coverage.New(coverage.Options{})
-	code, err := coverTests(useCases, patterns)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "go_lint:", err)
-		return 2
+	total, err := coverTests(useCases, patterns)
+	var exit *exec.ExitError
+	if errors.As(err, &exit) {
+		return exit.ExitCode()
 	}
-	if code != 0 {
-		return code
-	}
-	profile, err := os.ReadFile(coverageProfile)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "go_lint:", err)
-		return 2
-	}
-	total, err := useCases.Total(bytes.NewReader(profile))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "go_lint:", err)
 		return 2
@@ -75,55 +62,32 @@ func cover(args []string) int {
 	return 0
 }
 
-// coverTests runs go test over the patterns, writes the profile and the test report, and prints the run. It returns
-// go test's exit code, or an error when go test did not run.
-func coverTests(useCases *coverage.UseCases, patterns []string) (int, error) {
+// coverTests runs go test over the patterns, writes the profile and returns its total. It returns go test's
+// *exec.ExitError when a test fails.
+func coverTests(useCases *coverage.UseCases, patterns []string) (float64, error) {
 	list := exec.CommandContext(context.Background(), "go", append([]string{"list"}, patterns...)...)
 	list.Stderr = os.Stderr
 	listed, err := list.Output()
 	if err != nil {
-		return 0, fmt.Errorf("go list: %w", err)
+		// The error keeps go list's exit code out of reach, so a failed go list exits 2, as a run that measured nothing.
+		return 0, fmt.Errorf("go list: %v", err)
 	}
 	measured := useCases.Measured(strings.Fields(string(listed)))
 	if len(measured) == 0 {
 		return 0, errors.New("every package is a test kit, so there is no code to measure")
 	}
-	if err := os.MkdirAll(filepath.Dir(testReport), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(coverageProfile), 0o755); err != nil {
 		return 0, err
 	}
-	report, err := os.Create(testReport)
-	if err != nil {
-		return 0, err
-	}
-	args := append([]string{"test", "-json", "-coverpkg=" + strings.Join(measured, ","), "-coverprofile=" + coverageProfile}, patterns...)
+	args := append([]string{"test", "-coverpkg=" + strings.Join(measured, ","), "-coverprofile=" + coverageProfile}, patterns...)
 	test := exec.CommandContext(context.Background(), "go", args...)
-	test.Stderr = os.Stderr
-	stream, err := test.StdoutPipe()
+	test.Stdout, test.Stderr = os.Stdout, os.Stderr
+	if err := test.Run(); err != nil {
+		return 0, err
+	}
+	profile, err := os.ReadFile(coverageProfile)
 	if err != nil {
 		return 0, err
 	}
-	if err := test.Start(); err != nil {
-		_ = report.Close()
-		return 0, err
-	}
-	printErr := useCases.Print(io.TeeReader(stream, report), os.Stdout)
-	if printErr != nil {
-		// The function reads the rest of the stream before the wait, so go test does not block on a full pipe and the
-		// wait does not hang.
-		_, _ = io.Copy(io.Discard, stream)
-	}
-	err = test.Wait()
-	// The function returns a failed close as an error. A report cut short by a failed write would reach SonarQube as a
-	// run with fewer tests.
-	if closeErr := report.Close(); printErr == nil {
-		printErr = closeErr
-	}
-	if printErr != nil {
-		return 0, printErr
-	}
-	var exit *exec.ExitError
-	if errors.As(err, &exit) {
-		return exit.ExitCode(), nil
-	}
-	return 0, err
+	return useCases.Total(bytes.NewReader(profile))
 }
