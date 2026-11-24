@@ -30,7 +30,7 @@ func TestMain(m *testing.M) {
 	// Under `mise run test:ci` the binary writes its coverage beside the tests', so the code it runs counts.
 	flag.Parse()
 	if coverDir := flag.Lookup("test.gocoverdir"); testing.CoverMode() != "" && coverDir.Value.String() != "" {
-		args = append(args, "-cover", "-coverpkg=github.com/kk-forge-engineering/go-lint/v5/...")
+		args = append(args, "-cover", "-coverpkg=github.com/kk-forge-engineering/go-lint/v6/...")
 		_ = os.Setenv("GOCOVERDIR", coverDir.Value.String())
 	}
 	build := exec.Command("go", append(args, "../../cmd/go_lint")...)
@@ -89,7 +89,9 @@ func goLintIn(t *testing.T, dir, home string, args ...string) (string, int) {
 	command := exec.Command(binary, args...)
 	command.Dir = dir
 	// The go tool's caches stay where they are, so the run compiles nothing again.
-	command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, ".cache"),
+	// golangci-lint refuses to start while another run holds its lock file in the temp folder. A temp folder under
+	// home keeps the run apart from the go-lint that `mise run check` starts beside the tests.
+	command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, ".cache"), "TMPDIR="+home,
 		"GOCACHE="+goEnv["GOCACHE"], "GOMODCACHE="+goEnv["GOMODCACHE"], "GOLANGCI_LINT_CACHE="+filepath.Join(home, "golangci-lint"))
 	output, err := command.CombinedOutput()
 	var exitErr *exec.ExitError
@@ -104,7 +106,7 @@ func goLintIn(t *testing.T, dir, home string, args ...string) (string, int) {
 
 var issue = regexp.MustCompile(`(?m)^(\S+:\d+):\d+: .* \((\w+)\)$`)
 
-func TestRunReportsTheLayersAnalyzerAndAppliesTheProjectExclusions(t *testing.T) {
+func TestRunReportsGoLintsAnalyzersAndAppliesTheProjectExclusions(t *testing.T) {
 	output, code := goLint(t, "run", "./...")
 
 	var got []string
@@ -112,10 +114,10 @@ func TestRunReportsTheLayersAnalyzerAndAppliesTheProjectExclusions(t *testing.T)
 		got = append(got, match[1]+" "+match[2])
 	}
 	slices.Sort(got)
-	// features/b's errcheck issue is excluded by testdata/consumer/go_lint.yml, and the request and TLS setting in features/f's
-	// tests by the built-in exclusion for test files.
+	// The list leaves out features/b's errcheck issue, which testdata/consumer/go_lint.yml excludes, and the request
+	// and TLS setting in features/f's tests, which the built-in exclusion for test files excludes.
 	want := []string{
-		"features/a/a.go:3 layers", "features/c/c.go:7 nolintlint", "features/d/d.go:7 nolintlint",
+		"features/a/a.go:1 doccomments", "features/a/a.go:4 layers", "features/c/c.go:7 nolintlint", "features/d/d.go:7 nolintlint",
 		"features/f/f.go:13 noctx", "features/f/f.go:7 gochecknoinits", "features/f/tls.go:12 gosec",
 		"features/f/tls.go:7 gosec",
 	}
@@ -228,6 +230,53 @@ func TestRunReportsAFeatureInfraImportThePortDroppedSinceTheCachedRun(t *testing
 	}
 }
 
+// covered copies testdata/covered, where `go_lint cover` writes its profile, into a folder of the test's own.
+func covered(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS("testdata/covered")); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// TestCoverLeavesOutTheTestKitsAndWritesTheProfile expects a total of 88.9%. The fixture's kit calc_testing holds
+// most of its statements, and no test runs them: counted, they would bring the total down to 56.2%.
+func TestCoverLeavesOutTheTestKitsAndWritesTheProfile(t *testing.T) {
+	dir := covered(t)
+
+	output, code := goLintIn(t, dir, t.TempDir(), "cover")
+
+	if code != 0 || !strings.Contains(output, "coverage 88.9% of statements, floor 80%") {
+		t.Errorf("go_lint cover exited %d, want 0 with a total of 88.9%%\n%s", code, output)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "coverage", "coverage.out")); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCoverFailsUnderTheFloor(t *testing.T) {
+	output, code := goLintIn(t, covered(t), t.TempDir(), "cover", "--min", "90")
+
+	if code != 1 || !strings.Contains(output, "coverage 88.9% of statements is under the floor of 90%") {
+		t.Errorf("go_lint cover --min 90 exited %d, want 1 with the total under the floor\n%s", code, output)
+	}
+}
+
+func TestCoverFailsAndPrintsAFailedTest(t *testing.T) {
+	dir := covered(t)
+	failing := "package calc_test\n\nimport \"testing\"\n\nfunc TestFails(t *testing.T) { t.Error(\"the output of a test that fails\") }\n"
+	if err := os.WriteFile(filepath.Join(dir, "calc", "fails_test.go"), []byte(failing), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	output, code := goLintIn(t, dir, t.TempDir(), "cover")
+
+	if code != 1 || !strings.Contains(output, "the output of a test that fails") || strings.Contains(output, "floor") {
+		t.Errorf("go_lint cover with a failing test exited %d, want 1 with the test's output and no total\n%s", code, output)
+	}
+}
+
 func TestGoLintRefuses(t *testing.T) {
 	for _, test := range []struct {
 		name string
@@ -247,6 +296,10 @@ func TestGoLintRefuses(t *testing.T) {
 		{"a flag that changes the exit code", []string{"run", "--issues-exit-code=0"}, "--issues-exit-code changes"},
 		{"a filter to new issues", []string{"run", "-n"}, "-n changes the built-in configuration"},
 		{"a flag to vuln", []string{"vuln", "-db", "file:///tmp/db"}, "-db is a flag, and go_lint vuln takes package patterns only"},
+		{"a coverage floor under 80%", []string{"cover", "--min", "79.9"}, "--min 79.9 is outside 80 to 100"},
+		{"a coverage floor that is no number", []string{"cover", "--min", "NaN"}, "--min NaN is outside 80 to 100"},
+		{"a flag after a package pattern", []string{"cover", "./...", "--min", "90"}, "--min is a flag after a package pattern"},
+		{"a flag cover does not take", []string{"cover", "-race"}, "flag provided but not defined: -race"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			output, code := goLint(t, test.args...)

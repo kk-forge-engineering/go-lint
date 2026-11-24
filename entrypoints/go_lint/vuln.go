@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/vuln/scan"
 
-	"github.com/kk-forge-engineering/go-lint/v5/infra/env"
+	"github.com/kk-forge-engineering/go-lint/v6/infra/env"
 )
 
 // vuln runs govulncheck over the packages, ./... when none is named, and returns its exit code, which is 3 when the
